@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Admin {
+  id           String         @id @default(cuid())
+  name         String
+  email        String         @unique
+  passwordHash String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     AdminSession[]
+
+  @@map("admins")
+}
+
+model AdminSession {
+  id        String   @id @default(cuid())
+  adminId   String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([expiresAt])
+  @@map("admin_sessions")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  mobileNumber String
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  tables       VenueTable[]
+  customers    Customer[]
+  sessions     GameSession[]
+
+  @@map("users")
+}
+
+model VenueTable {
+  id              String        @id @default(cuid())
+  ownerId         String
+  name            String
+  category        TableCategory
+  pricingMode     PricingMode
+  price           Int
+  durationMinutes Int?
+  status          TableStatus   @default(AVAILABLE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  owner           User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sessions        GameSession[]
+
+  @@unique([ownerId, name])
+  @@unique([id, ownerId])
+  @@index([ownerId, status])
+  @@map("tables")
+}
+
+model Customer {
+  id             String          @id @default(cuid())
+  ownerId        String
+  name           String
+  mobileNumber   String
+  walletBalance  Int             @default(0)
+  pendingAmount  Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  owner          User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sessions       GameSession[]
+  players        SessionPlayer[]
+  payments       PaymentRecord[]
+  walletEntries  WalletLedger[]
+  pendingEntries PendingLedger[]
+
+  @@unique([ownerId, mobileNumber])
+  @@unique([id, ownerId])
+  @@index([ownerId])
+  @@map("customers")
+}
+
+model GameSession {
+  id                     String           @id @default(cuid())
+  ownerId                String
+  tableId                String
+  primaryCustomerId      String
+  pricingMode            PricingMode
+  tablePrice             Int
+  gameCount              Int              @default(1)
+  plannedDurationMinutes Int
+  defaultDurationMinutes Int              @default(45)
+  calculatedAmount       Int
+  finalAmount            Int?
+  status                 SessionStatus    @default(ACTIVE)
+  ownerPlaying           Boolean          @default(false)
+  ownerResult            OwnerGameResult?
+  startedAt              DateTime         @default(now())
+  pauseStartedAt         DateTime?
+  totalPausedSeconds     Int              @default(0)
+  endedAt                DateTime?
+  finalizedAt            DateTime?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  owner                  User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  table                  VenueTable       @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  primaryCustomer        Customer         @relation(fields: [primaryCustomerId], references: [id], onDelete: Restrict)
+  players                SessionPlayer[]
+  payments               PaymentRecord[]
+
+  @@unique([id, ownerId])
+  @@index([ownerId, status])
+  @@index([ownerId, tableId, status])
+  @@index([ownerId, primaryCustomerId])
+  @@index([ownerId, status, finalizedAt])
+  @@map("game_sessions")
+}
+
+model SessionPlayer {
+  id          String          @id @default(cuid())
+  ownerId     String
+  sessionId   String
+  customerId  String
+  splitAmount Int
+  createdAt   DateTime        @default(now())
+  session     GameSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  customer    Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  payments    PaymentRecord[]
+
+  @@unique([sessionId, customerId])
+  @@index([ownerId, customerId])
+  @@map("session_players")
+}
+
+model PaymentRecord {
+  id         String         @id @default(cuid())
+  ownerId    String
+  sessionId  String
+  customerId String
+  playerId   String?
+  mode       PaymentMode
+  amount     Int
+  createdAt  DateTime       @default(now())
+  session    GameSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  customer   Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  player     SessionPlayer? @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, sessionId])
+  @@index([ownerId, customerId])
+  @@index([ownerId, createdAt])
+  @@map("payment_records")
+}
+
+model WalletLedger {
+  id         String           @id @default(cuid())
+  ownerId    String
+  customerId String
+  sessionId  String?
+  type       WalletLedgerType
+  amount     Int
+  note       String?
+  createdAt  DateTime         @default(now())
+  customer   Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, customerId])
+  @@index([ownerId, createdAt])
+  @@map("wallet_ledger")
+}
+
+model PendingLedger {
+  id         String            @id @default(cuid())
+  ownerId    String
+  customerId String
+  sessionId  String?
+  type       PendingLedgerType
+  amount     Int
+  note       String?
+  createdAt  DateTime          @default(now())
+  customer   Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, customerId])
+  @@index([ownerId, createdAt])
+  @@map("pending_ledger")
+}
+
+enum TableCategory {
+  POOL
+  SNOOKER
+}
+
+enum PricingMode {
+  PER_HOUR
+  PER_GAME
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+}
+
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+  COMPLETED
+  CANCELLED
+}
+
+enum OwnerGameResult {
+  OWNER_WON
+  OWNER_LOST
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  WALLET
+  PENDING
+}
+
+enum WalletLedgerType {
+  CREDIT
+  DEBIT
+}
+
+enum PendingLedgerType {
+  CREATED
+  PAID
+}
