@@ -3,7 +3,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
-const adapter = new PrismaPg(process.env.DATABASE_URL);
+const adapter = new PrismaPg(process.env.DIRECT_URL ?? process.env.DATABASE_URL);
 const prisma = new PrismaClient({ adapter });
 
 const users = [
