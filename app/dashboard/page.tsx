@@ -26,5 +26,5 @@ export default async function DashboardPage() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
 
-  return <DashboardShell userName={user.name} greeting={greeting} />;
+  return <DashboardShell userName={user.name} userEmail={user.email} greeting={greeting} />;
 }

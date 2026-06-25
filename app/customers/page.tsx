@@ -24,7 +24,7 @@ export default async function CustomersPage() {
   }
 
   return (
-    <DashboardAppShell title="Customers" userName={user.name} greeting="Customer management">
+    <DashboardAppShell title="Customers" userName={user.name} userEmail={user.email} greeting="Customer management">
       <CustomerManager />
     </DashboardAppShell>
   );

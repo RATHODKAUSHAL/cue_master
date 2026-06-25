@@ -24,7 +24,7 @@ export default async function SessionsPage() {
   }
 
   return (
-    <DashboardAppShell title="Sessions" userName={user.name} greeting="Create and bill sessions">
+    <DashboardAppShell title="Sessions" userName={user.name} userEmail={user.email} greeting="Create and bill sessions">
       <div className="font-sans">
         <SessionManager />
       </div>

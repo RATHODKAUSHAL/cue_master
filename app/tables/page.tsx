@@ -24,7 +24,7 @@ export default async function TablesPage() {
   }
 
   return (
-    <DashboardAppShell title="Tables" userName={user.name} greeting="Manage your venue tables">
+    <DashboardAppShell title="Tables" userName={user.name} userEmail={user.email} greeting="Manage your venue tables">
       <TableManager />
     </DashboardAppShell>
   );

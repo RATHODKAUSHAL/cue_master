@@ -24,7 +24,7 @@ export default async function HistoryPage() {
   }
 
   return (
-    <DashboardAppShell title="History" userName={user.name} greeting="Completed session history">
+    <DashboardAppShell title="History" userName={user.name} userEmail={user.email} greeting="Completed session history">
       <SessionHistory />
     </DashboardAppShell>
   );

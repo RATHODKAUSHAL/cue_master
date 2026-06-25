@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { DashboardAnalytics } from "@/components/dashboard/dashboard-analytics";
@@ -51,6 +51,12 @@ export function DashboardIcon({ name, className }: { name: string; className?: s
     plus: <path className={common} d="M12 5v14M5 12h14" />,
     calendar: <path className={common} d="M7 3v4M17 3v4M4 8h16M5 5h14v15H5z" />,
     chevron: <path className={common} d="m8 10 4 4 4-4" />,
+    user: (
+      <>
+        <path className={common} d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+        <path className={common} d="M4.5 20a7.5 7.5 0 0 1 15 0" />
+      </>
+    ),
   };
 
   return (
@@ -211,15 +217,85 @@ function MobileSidebar({
   );
 }
 
+function getInitials(name?: string) {
+  return (name || "VO")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function UserMenu({ userName, userEmail }: { userName?: string; userEmail?: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const displayName = userName || "Venue Owner";
+  const displayEmail = userEmail || "No email available";
+
+  async function logout() {
+    setLoggingOut(true);
+    try {
+      window.localStorage.removeItem("cuedesk_admin_token");
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+      router.replace("/");
+      router.refresh();
+    } finally {
+      setLoggingOut(false);
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label="Open user menu"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="grid size-10 shrink-0 place-items-center rounded-md bg-zinc-950 text-xs font-semibold text-white transition hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950"
+      >
+        <span className="hidden sm:inline">{getInitials(displayName)}</span>
+        <DashboardIcon name="user" className="size-5 sm:hidden" />
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 mt-3 w-72 rounded-lg border border-zinc-200 bg-white p-3 text-left shadow-xl shadow-zinc-950/10">
+          <div className="flex items-center gap-3 border-b border-zinc-100 pb-3">
+            <div className="grid size-10 shrink-0 place-items-center rounded-md bg-zinc-950 text-xs font-semibold text-white">
+              {getInitials(displayName)}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-zinc-950">{displayName}</p>
+              <p className="truncate text-xs text-zinc-500">{displayEmail}</p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-3 w-full justify-center"
+            onClick={logout}
+            disabled={loggingOut}
+          >
+            {loggingOut ? "Logging out..." : "Logout"}
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function DashboardAppShell({
   children,
   title,
   userName,
+  userEmail,
   greeting,
 }: {
   children: ReactNode;
   title: string;
   userName?: string;
+  userEmail?: string;
   greeting?: string;
 }) {
   const pathname = usePathname();
@@ -261,14 +337,7 @@ export function DashboardAppShell({
                 </p>
                 <p className="truncate text-xs text-zinc-500">{greeting || "CueDesk CRM"}</p>
               </div>
-              <div className="grid size-10 shrink-0 place-items-center rounded-md bg-zinc-950 text-xs font-semibold text-white">
-                {(userName || "VO")
-                  .split(" ")
-                  .map((part) => part[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase()}
-              </div>
+              <UserMenu userName={userName} userEmail={userEmail} />
             </div>
           </div>
         </header>
@@ -279,9 +348,17 @@ export function DashboardAppShell({
   );
 }
 
-export function DashboardShell({ userName, greeting }: { userName: string; greeting: string }) {
+export function DashboardShell({
+  userName,
+  userEmail,
+  greeting,
+}: {
+  userName: string;
+  userEmail: string;
+  greeting: string;
+}) {
   return (
-    <DashboardAppShell title="Dashboard" userName={userName} greeting={greeting}>
+    <DashboardAppShell title="Dashboard" userName={userName} userEmail={userEmail} greeting={greeting}>
       <DashboardAnalytics userName={userName} greeting={greeting} />
     </DashboardAppShell>
   );
