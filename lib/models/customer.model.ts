@@ -16,11 +16,11 @@ export function findCustomerByMobile(ownerId: string, mobileNumber: string) {
   });
 }
 
-export function listCustomers(ownerId: string, search?: string) {
+export async function listCustomers(ownerId: string, search?: string) {
   const normalizedSearch = search?.trim();
   const mobileSearch = normalizedSearch?.replace(/\D/g, "");
 
-  return prisma.customer.findMany({
+  const customers = await prisma.customer.findMany({
     where: {
       ownerId,
       ...(normalizedSearch
@@ -47,12 +47,45 @@ export function listCustomers(ownerId: string, search?: string) {
     },
     include: {
       pendingEntries: {
+        where: { type: "CREATED" },
         orderBy: { createdAt: "desc" },
         take: 5,
       },
     },
     orderBy: [{ name: "asc" }, { updatedAt: "desc" }],
     take: 500,
+  });
+
+  if (!customers.length) {
+    return customers;
+  }
+
+  const ledgerRows = await prisma.pendingLedger.groupBy({
+    by: ["customerId", "type"],
+    where: {
+      ownerId,
+      customerId: { in: customers.map((customer) => customer.id) },
+    },
+    _sum: { amount: true },
+  });
+
+  const ledgerBalances = new Map<string, number>();
+
+  for (const row of ledgerRows) {
+    const current = ledgerBalances.get(row.customerId) || 0;
+    const amount = row._sum.amount || 0;
+    ledgerBalances.set(row.customerId, row.type === "CREATED" ? current + amount : current - amount);
+  }
+
+  return customers.map((customer) => {
+    const ledgerPendingAmount = Math.max(0, ledgerBalances.get(customer.id) || 0);
+    const pendingAmount = Math.max(customer.pendingAmount, ledgerPendingAmount);
+
+    return {
+      ...customer,
+      pendingAmount,
+      pendingEntries: pendingAmount > 0 ? customer.pendingEntries : [],
+    };
   });
 }
 
@@ -87,15 +120,41 @@ export function upsertCustomerByMobile(ownerId: string, data: CustomerPayload) {
 
 export async function payCustomerPending(ownerId: string, customerId: string, amount: number) {
   const rows = await prisma.$queryRaw<Array<{ pendingAmount: number }>>`
-    WITH updated_customer AS (
+    WITH ledger_balance AS (
+      SELECT
+        customer.id,
+        GREATEST(
+          customer."pendingAmount",
+          COALESCE(
+            SUM(
+              CASE
+                WHEN ledger.type = 'CREATED' THEN ledger.amount
+                WHEN ledger.type = 'PAID' THEN -ledger.amount
+                ELSE 0
+              END
+            ),
+            0
+          )
+        )::integer AS "currentPendingAmount"
+      FROM customers customer
+      LEFT JOIN pending_ledger ledger
+        ON ledger."customerId" = customer.id
+       AND ledger."ownerId" = ${ownerId}
+      WHERE customer.id = ${customerId}
+        AND customer."ownerId" = ${ownerId}
+      GROUP BY customer.id, customer."pendingAmount"
+    ),
+    updated_customer AS (
       UPDATE customers
       SET
-        "pendingAmount" = "pendingAmount" - ${amount},
+        "pendingAmount" = ledger_balance."currentPendingAmount" - ${amount},
         "updatedAt" = NOW()
-      WHERE id = ${customerId}
-        AND "ownerId" = ${ownerId}
-        AND "pendingAmount" >= ${amount}
-      RETURNING id, "pendingAmount"
+      FROM ledger_balance
+      WHERE customers.id = ${customerId}
+        AND customers."ownerId" = ${ownerId}
+        AND customers.id = ledger_balance.id
+        AND ledger_balance."currentPendingAmount" >= ${amount}
+      RETURNING customers.id, customers."pendingAmount"
     ),
     ledger AS (
       INSERT INTO pending_ledger (
@@ -103,9 +162,9 @@ export async function payCustomerPending(ownerId: string, customerId: string, am
         type, amount, note, "createdAt"
       )
       SELECT
-        'l' || md5(random()::text || clock_timestamp()::text || id),
+        'l' || md5(random()::text || clock_timestamp()::text || updated_customer.id),
         ${ownerId},
-        id,
+        updated_customer.id,
         NULL,
         'PAID',
         ${amount},

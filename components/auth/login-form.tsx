@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { saveUserSession } from "@/lib/auth/client";
 
 export function LoginForm() {
   const router = useRouter();
@@ -31,6 +32,10 @@ export function LoginForm() {
       if (!response.ok) {
         setError(data.message || "Unable to login.");
         return;
+      }
+
+      if (typeof data.token === "string") {
+        saveUserSession(data.token);
       }
 
       router.push(redirectTo);

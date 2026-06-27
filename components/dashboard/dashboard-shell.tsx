@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { DashboardAnalytics } from "@/components/dashboard/dashboard-analytics";
+import { clearUserSession, userFetch } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -13,10 +14,7 @@ const navItems = [
   { label: "Sessions", icon: "clock", href: "/sessions" },
   { label: "History", icon: "history", href: "/history" },
   { label: "Customers", icon: "users", href: "/customers" },
-  { label: "Invoices", icon: "receipt", href: "#" },
-  { label: "Payments", icon: "card", href: "#" },
-  { label: "Reports", icon: "chart", href: "#" },
-  { label: "Settings", icon: "settings", href: "#" },
+  { label: "Reports", icon: "chart", href: "/reports" },
 ];
 
 export function DashboardIcon({ name, className }: { name: string; className?: string }) {
@@ -237,7 +235,8 @@ function UserMenu({ userName, userEmail }: { userName?: string; userEmail?: stri
     setLoggingOut(true);
     try {
       window.localStorage.removeItem("cuedesk_admin_token");
-      await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+      await userFetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+      clearUserSession();
       router.replace("/");
       router.refresh();
     } finally {

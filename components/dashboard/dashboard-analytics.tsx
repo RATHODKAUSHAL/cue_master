@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { userFetch } from "@/lib/auth/client";
 
 type Period = "day" | "week" | "month";
 
@@ -158,7 +159,7 @@ export function DashboardAnalytics({
 
     try {
       const params = new URLSearchParams({ period: nextPeriod, date: nextDate });
-      const response = await fetch(`/api/dashboard?${params}`, { cache: "no-store" });
+      const response = await userFetch(`/api/dashboard?${params}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) throw new Error(data.message || "Unable to load analytics.");
@@ -176,7 +177,7 @@ export function DashboardAnalytics({
     const controller = new AbortController();
     const params = new URLSearchParams({ period: "day", date: indiaToday() });
 
-    fetch(`/api/dashboard?${params}`, { cache: "no-store", signal: controller.signal })
+    userFetch(`/api/dashboard?${params}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.message || "Unable to load analytics.");

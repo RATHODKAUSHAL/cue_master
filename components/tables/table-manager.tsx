@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DashboardIcon } from "@/components/dashboard/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { userFetch } from "@/lib/auth/client";
 import {
   Table,
   TableBody,
@@ -80,6 +81,9 @@ export function TableManager() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [deletingTable, setDeletingTable] = useState<VenueTable | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   async function loadTables(showLoading = true) {
     if (showLoading) {
@@ -88,7 +92,7 @@ export function TableManager() {
 
     try {
       setLoadError("");
-      const response = await fetch("/api/tables", { cache: "no-store" });
+      const response = await userFetch("/api/tables", { cache: "no-store" });
       const data = await response.json();
 
       if (!response.ok) {
@@ -109,7 +113,7 @@ export function TableManager() {
   useEffect(() => {
     let active = true;
 
-    fetch("/api/tables", { cache: "no-store" })
+    userFetch("/api/tables", { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json();
 
@@ -163,7 +167,7 @@ export function TableManager() {
 
     const url = editingTable ? `/api/tables/${editingTable.id}` : "/api/tables";
     const method = editingTable ? "PUT" : "POST";
-    const response = await fetch(url, {
+    const response = await userFetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -185,15 +189,34 @@ export function TableManager() {
     await loadTables();
   }
 
-  async function deleteSelectedTable(table: VenueTable) {
-    const confirmed = window.confirm(`Delete ${table.name}?`);
+  function openDeleteConfirmation(table: VenueTable) {
+    setDeletingTable(table);
+    setDeleteError("");
+  }
 
-    if (!confirmed) {
-      return;
+  async function deleteSelectedTable() {
+    if (!deletingTable) return;
+
+    setDeleting(true);
+    setDeleteError("");
+
+    try {
+      const response = await userFetch(`/api/tables/${deletingTable.id}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to delete table.");
+      }
+
+      setDeletingTable(null);
+      await loadTables(false);
+    } catch (deleteTableError) {
+      setDeleteError(
+        deleteTableError instanceof Error ? deleteTableError.message : "Unable to delete table.",
+      );
+    } finally {
+      setDeleting(false);
     }
-
-    await fetch(`/api/tables/${table.id}`, { method: "DELETE" });
-    await loadTables();
   }
 
   return (
@@ -254,7 +277,7 @@ export function TableManager() {
                             variant="outline"
                             size="sm"
                             className="text-red-600 hover:bg-red-50"
-                            onClick={() => deleteSelectedTable(table)}
+                            onClick={() => openDeleteConfirmation(table)}
                           >
                             Delete
                           </Button>
@@ -409,6 +432,49 @@ export function TableManager() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {deletingTable ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-950/40 px-4">
+          <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white shadow-2xl">
+            <div className="border-b border-zinc-200 p-5">
+              <h2 className="text-lg font-semibold text-zinc-950">Delete Table</h2>
+              <p className="mt-2 text-sm text-zinc-500">
+                are you sure want tou delete this table.
+              </p>
+              <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                {deletingTable.name}
+              </p>
+            </div>
+
+            <div className="grid gap-4 p-5">
+              {deleteError ? (
+                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                  {deleteError}
+                </p>
+              ) : null}
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => setDeletingTable(null)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={deleteSelectedTable}
+                  disabled={deleting}
+                >
+                  {deleting ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       ) : null}

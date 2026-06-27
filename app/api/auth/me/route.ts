@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getCurrentSession } from "@/lib/auth/session";
+import { getCurrentSessionFromRequest } from "@/lib/auth/session";
 import { getAuthenticatedUser } from "@/lib/controllers/auth.controller";
 
-export async function GET() {
-  const session = await getCurrentSession();
+export async function GET(request: Request) {
+  const session = await getCurrentSessionFromRequest(request);
 
   if (!session) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

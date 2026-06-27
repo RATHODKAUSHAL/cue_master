@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSessionCookie } from "@/lib/auth/session";
+import { createSessionCookie, createSessionToken } from "@/lib/auth/session";
 import { loginUser } from "@/lib/controllers/auth.controller";
 
 export async function POST(request: Request) {
@@ -14,12 +14,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: result.message }, { status: result.status });
     }
 
-    const response = NextResponse.json({ user: result.user });
-    await createSessionCookie(response, {
+    const token = await createSessionToken({
       userId: result.user.id,
       email: result.user.email,
       name: result.user.name,
     });
+    const response = NextResponse.json({ user: result.user, token });
+    await createSessionCookie(response, token);
 
     return response;
   } catch {

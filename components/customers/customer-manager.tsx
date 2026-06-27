@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardIcon } from "@/components/dashboard/dashboard-shell";
+import { userFetch } from "@/lib/auth/client";
 import {
   Table,
   TableBody,
@@ -111,7 +112,7 @@ export function CustomerManager() {
     try {
       const params = new URLSearchParams();
       if (search.trim()) params.set("search", search.trim());
-      const response = await fetch(`/api/customers?${params}`, { cache: "no-store" });
+      const response = await userFetch(`/api/customers?${params}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) throw new Error(data.message || "Unable to load customers.");
@@ -126,7 +127,7 @@ export function CustomerManager() {
   useEffect(() => {
     let active = true;
 
-    fetch("/api/customers", { cache: "no-store" })
+    userFetch("/api/customers", { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.message || "Unable to load customers.");
@@ -173,7 +174,7 @@ export function CustomerManager() {
     setFormError("");
 
     try {
-      const response = await fetch("/api/customers", {
+      const response = await userFetch("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: customerName, mobileNumber }),
@@ -204,7 +205,7 @@ export function CustomerManager() {
     setPaymentError("");
 
     try {
-      const response = await fetch(`/api/customers/${payingCustomer.id}/pay-pending`, {
+      const response = await userFetch(`/api/customers/${payingCustomer.id}/pay-pending`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: Number(pendingPaymentAmount) }),
@@ -225,6 +226,8 @@ export function CustomerManager() {
       if (profile?.id === payingCustomer.id) {
         await openCustomerProfile(payingCustomer.id);
       }
+
+      await loadCustomers(activeSearch, false);
     } catch (payError) {
       setPaymentError(
         payError instanceof Error ? payError.message : "Unable to pay pending amount.",
@@ -242,7 +245,7 @@ export function CustomerManager() {
     setProfileLoading(true);
 
     try {
-      const response = await fetch(`/api/customers/${customerId}`, { cache: "no-store" });
+      const response = await userFetch(`/api/customers/${customerId}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message || "Unable to load customer profile.");
       setProfile(data.customer);
@@ -356,54 +359,55 @@ export function CustomerManager() {
                   </TableRow>
                 ) : customers.length ? (
                   customers.map((customer) => (
-                    <TableRow key={customer.id}>
-                      <TableCell className="font-semibold">{customer.name}</TableCell>
-                      <TableCell>{customer.mobileNumber}</TableCell>
-                      <TableCell
-                        className={customer.pendingAmount > 0 ? "font-semibold text-red-600" : ""}
-                      >
-                        {money(customer.pendingAmount)}
-                      </TableCell>
-                      <TableCell>{money(customer.walletBalance)}</TableCell>
-                      <TableCell>
-                        {customer.pendingEntries[0]
-                          ? `${money(customer.pendingEntries[0].amount)} · ${new Date(
-                              customer.pendingEntries[0].createdAt,
-                            ).toLocaleDateString("en-IN")}`
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            customer.pendingAmount > 0
-                              ? "border-red-200 bg-red-50 text-red-700"
-                              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                          }
+                      <TableRow key={customer.id}>
+                        <TableCell className="font-semibold">{customer.name}</TableCell>
+                        <TableCell>{customer.mobileNumber}</TableCell>
+                        <TableCell
+                          className={customer.pendingAmount > 0 ? "font-semibold text-red-600" : ""}
                         >
-                          {customer.pendingAmount > 0 ? "Payment Pending" : "Clear"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
+                          {money(customer.pendingAmount)}
+                        </TableCell>
+                        <TableCell>{money(customer.walletBalance)}</TableCell>
+                        <TableCell>
+                          {customer.pendingEntries[0]
+                            ? `${money(customer.pendingEntries[0].amount)} · ${new Date(
+                                customer.pendingEntries[0].createdAt,
+                              ).toLocaleDateString("en-IN")}`
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
                             variant="outline"
-                            disabled={customer.pendingAmount <= 0}
-                            onClick={() => openPendingPayment(customer)}
+                            className={
+                              customer.pendingAmount > 0
+                                ? "border-red-200 bg-red-50 text-red-700"
+                                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            }
                           >
-                            Pay Pending
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => openCustomerProfile(customer.id)}
-                          >
-                            Customer Profile
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                            {customer.pendingAmount > 0 ? "Payment Pending" : "No Pending"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            {customer.pendingAmount > 0 ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openPendingPayment(customer)}
+                              >
+                                Pay Pending Amount
+                              </Button>
+                            ) : null}
+                            <Button
+                              size="sm"
+                              onClick={() => openCustomerProfile(customer.id)}
+                            >
+                              Customer Profile
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
                 ) : (
                   <TableRow>
                     <TableCell colSpan={7} className="py-12 text-center text-zinc-500">

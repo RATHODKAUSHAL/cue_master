@@ -1,30 +1,20 @@
 import { NextResponse } from "next/server";
-import { getCurrentSession } from "@/lib/auth/session";
+import { requireApiSession } from "@/lib/api/session-middleware";
 import { createTableForUser, getTablesForUser } from "@/lib/controllers/table.controller";
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
 }
 
-async function requireSession() {
-  const session = await getCurrentSession();
+export async function GET(request: Request) {
+  const auth = await requireApiSession(request);
 
-  if (!session) {
-    return null;
-  }
-
-  return session;
-}
-
-export async function GET() {
-  const session = await requireSession();
-
-  if (!session) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
   }
 
   try {
-    const tables = await getTablesForUser(session.userId);
+    const tables = await getTablesForUser(auth.session.userId);
     return NextResponse.json({ tables });
   } catch (error) {
     console.error("Unable to load tables", error);
@@ -40,14 +30,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await requireSession();
+  const auth = await requireApiSession(request);
 
-  if (!session) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
   }
 
   const body = await request.json();
-  const result = await createTableForUser(session.userId, {
+  const result = await createTableForUser(auth.session.userId, {
     name: String(body.name ?? ""),
     category: String(body.category ?? ""),
     pricingMode: String(body.pricingMode ?? ""),

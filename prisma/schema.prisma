@@ -60,7 +60,6 @@ model VenueTable {
   owner           User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   sessions        GameSession[]
 
-  @@unique([ownerId, name])
   @@unique([id, ownerId])
   @@index([ownerId, status])
   @@map("tables")

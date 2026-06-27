@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getCurrentSession } from "@/lib/auth/session";
+import { getCurrentSessionFromRequest } from "@/lib/auth/session";
 import { checkRateLimit } from "@/lib/api/rate-limit";
 
-export async function requireApiSession(request?: Request) {
-  const session = await getCurrentSession();
+export async function requireApiSession(request: Request) {
+  const session = await getCurrentSessionFromRequest(request);
 
   if (!session) {
     return {

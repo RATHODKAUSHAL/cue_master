@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { userFetch } from "@/lib/auth/client";
 import {
   Table,
   TableBody,
@@ -63,7 +64,7 @@ export function SessionHistory() {
       if (values.mobile.trim()) params.set("mobile", values.mobile.replace(/\D/g, ""));
       if (values.date) params.set("date", values.date);
 
-      const response = await fetch(`/api/sessions/history?${params}`, { cache: "no-store" });
+      const response = await userFetch(`/api/sessions/history?${params}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message || "Unable to load session history.");
       setSessions(data.sessions);
@@ -77,7 +78,7 @@ export function SessionHistory() {
   useEffect(() => {
     let active = true;
 
-    fetch("/api/sessions/history", { cache: "no-store" })
+    userFetch("/api/sessions/history", { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.message || "Unable to load session history.");

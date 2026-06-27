@@ -25,10 +25,6 @@ function getPrismaErrorCode(error: unknown) {
   return null;
 }
 
-function isUniqueConstraintError(error: unknown) {
-  return getPrismaErrorCode(error) === "P2002";
-}
-
 function isRecordNotFoundError(error: unknown) {
   return getPrismaErrorCode(error) === "P2025";
 }
@@ -99,11 +95,7 @@ export async function createTableForUser(ownerId: string, input: TableInput) {
   try {
     const table = await createTable(ownerId, normalized.data);
     return { ok: true as const, table };
-  } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      return { ok: false as const, status: 409, message: "A table with this name already exists." };
-    }
-
+  } catch {
     return { ok: false as const, status: 500, message: "Unable to create table." };
   }
 }
@@ -119,10 +111,6 @@ export async function updateTableForUser(ownerId: string, id: string, input: Tab
     const table = await updateTable(ownerId, id, normalized.data);
     return { ok: true as const, table };
   } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      return { ok: false as const, status: 409, message: "A table with this name already exists." };
-    }
-
     if (!isRecordNotFoundError(error)) {
       return { ok: false as const, status: 500, message: "Unable to update table." };
     }

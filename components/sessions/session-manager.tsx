@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardIcon } from "@/components/dashboard/dashboard-shell";
+import { userFetch } from "@/lib/auth/client";
 import {
   Table,
   TableBody,
@@ -178,8 +179,8 @@ export default function SessionManager() {
     try {
       setLoadError("");
       const [sessionsResponse, tablesResponse] = await Promise.all([
-        fetch("/api/sessions", { cache: "no-store" }),
-        fetch("/api/tables/available", { cache: "no-store" }),
+        userFetch("/api/sessions", { cache: "no-store" }),
+        userFetch("/api/tables/available", { cache: "no-store" }),
       ]);
       const [sessionsData, tablesData] = await Promise.all([
         readJson(sessionsResponse),
@@ -198,8 +199,8 @@ export default function SessionManager() {
     let active = true;
 
     Promise.all([
-      fetch("/api/sessions", { cache: "no-store" }),
-      fetch("/api/tables/available", { cache: "no-store" }),
+      userFetch("/api/sessions", { cache: "no-store" }),
+      userFetch("/api/tables/available", { cache: "no-store" }),
     ])
       .then(async ([sessionsResponse, tablesResponse]) => {
         const [sessionsData, tablesData] = await Promise.all([
@@ -260,7 +261,7 @@ export default function SessionManager() {
     if (mobile.length !== 10) return;
 
     try {
-      const response = await fetch(`/api/customers?mobile=${encodeURIComponent(mobile)}`, {
+      const response = await userFetch(`/api/customers?mobile=${encodeURIComponent(mobile)}`, {
         cache: "no-store",
       });
       const data = await readJson(response);
@@ -290,7 +291,7 @@ export default function SessionManager() {
 
     setSaving(true);
     try {
-      const response = await fetch(
+      const response = await userFetch(
         editingSession ? `/api/sessions/${editingSession.id}` : "/api/sessions",
         {
           method: editingSession ? "PATCH" : "POST",
@@ -321,7 +322,7 @@ export default function SessionManager() {
     setBusyId(session.id);
     setActionError("");
     try {
-      const response = await fetch(`/api/sessions/${session.id}/${action}`, { method: "POST" });
+      const response = await userFetch(`/api/sessions/${session.id}/${action}`, { method: "POST" });
       await readJson(response);
       await loadData(false);
     } catch (error) {
@@ -337,7 +338,7 @@ export default function SessionManager() {
     setBusyId(session.id);
     setActionError("");
     try {
-      const response = await fetch(`/api/sessions/${session.id}`, { method: "DELETE" });
+      const response = await userFetch(`/api/sessions/${session.id}`, { method: "DELETE" });
       await readJson(response);
       await loadData(false);
     } catch (error) {
@@ -443,7 +444,7 @@ export default function SessionManager() {
     setFinalizeSaving(true);
     setFinalizeError("");
     try {
-      const response = await fetch(`/api/sessions/${finalizingSession.id}/finalize`, {
+      const response = await userFetch(`/api/sessions/${finalizingSession.id}/finalize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
