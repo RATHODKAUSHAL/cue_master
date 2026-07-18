@@ -1,4 +1,6 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sendToUser } from "@/lib/push";
 
 export type StartSessionPayload = {
   customerName: string;
@@ -40,6 +42,7 @@ export type FinalizeSessionPayload = {
   ownerResult?: "OWNER_WON" | "OWNER_LOST" | null;
   players: SessionPlayerInput[];
   payments: SessionPaymentInput[];
+  addOnAmount?: number;
   extraPaymentAction?: "RETURN" | "WALLET" | null;
   extraAmount?: number;
 };
@@ -122,10 +125,39 @@ function sessionSummarySelect() {
   };
 }
 
-export function listSessions(ownerId: string, status?: string | null) {
+async function hydrateSessionExtras<T extends { id: string }>(sessions: T[]) {
+  if (!sessions.length) {
+    return sessions.map((session) => ({
+      ...session,
+      addOnAmount: 0,
+      completedNotificationSentAt: null as Date | null,
+    }));
+  }
+
+  const rows = await prisma.$queryRaw<
+    Array<{ id: string; addOnAmount: number; completedNotificationSentAt: Date | null }>
+  >`
+    SELECT
+      id,
+      COALESCE("addOnAmount", 0)::integer AS "addOnAmount",
+      "completedNotificationSentAt"
+    FROM game_sessions
+    WHERE id IN (${Prisma.join(sessions.map((session) => session.id))})
+  `;
+  const extrasBySession = new Map(rows.map((row) => [row.id, row]));
+
+  return sessions.map((session) => ({
+    ...session,
+    addOnAmount: extrasBySession.get(session.id)?.addOnAmount || 0,
+    completedNotificationSentAt:
+      extrasBySession.get(session.id)?.completedNotificationSentAt || null,
+  }));
+}
+
+export async function listSessions(ownerId: string, status?: string | null) {
   const normalizedStatus = isSessionStatus(status) ? status : undefined;
 
-  return prisma.gameSession.findMany({
+  const baseSessions = await prisma.gameSession.findMany({
     where: {
       ownerId,
       ...(normalizedStatus
@@ -135,6 +167,155 @@ export function listSessions(ownerId: string, status?: string | null) {
     select: sessionSummarySelect(),
     orderBy: { createdAt: "desc" },
   });
+
+  if (!baseSessions.length) {
+    return [];
+  }
+
+  const sessions = await hydrateSessionExtras(baseSessions);
+
+  if (!sessions.length) {
+    return sessions;
+  }
+
+  const customerIds = sessions.map((session) => session.primaryCustomer.id);
+  const ledgerRows = await prisma.pendingLedger.groupBy({
+    by: ["customerId", "type"],
+    where: {
+      ownerId,
+      customerId: { in: customerIds },
+    },
+    _sum: { amount: true },
+  });
+  const ledgerBalances = new Map<string, number>();
+
+  for (const row of ledgerRows) {
+    const current = ledgerBalances.get(row.customerId) || 0;
+    const amount = row._sum.amount || 0;
+    ledgerBalances.set(row.customerId, row.type === "CREATED" ? current + amount : current - amount);
+  }
+
+  return sessions.map((session) => ({
+    ...session,
+    primaryCustomer: {
+      ...session.primaryCustomer,
+      pendingAmount: Math.max(
+        session.primaryCustomer.pendingAmount,
+        Math.max(0, ledgerBalances.get(session.primaryCustomer.id) || 0),
+      ),
+    },
+  }));
+}
+
+export async function updateSessionAddOnAmount(ownerId: string, id: string, delta: number) {
+  const rows = await prisma.$queryRaw<Array<{ addOnAmount: number }>>`
+    UPDATE game_sessions session
+    SET
+      "addOnAmount" = GREATEST(0, session."addOnAmount" + ${delta}::integer),
+      "updatedAt" = NOW()
+    WHERE session.id = ${id}
+      AND session."ownerId" = ${ownerId}
+      AND session.status IN ('ACTIVE', 'PAUSED', 'ENDED')
+    RETURNING session."addOnAmount"
+  `;
+
+  return rows[0] || null;
+}
+
+function getSessionRemainingSeconds(session: {
+  status: SessionStatusValue;
+  plannedDurationMinutes: number;
+  startedAt: Date;
+  pauseStartedAt: Date | null;
+  endedAt: Date | null;
+  totalPausedSeconds: number;
+}) {
+  const durationSeconds = session.plannedDurationMinutes * 60;
+  const now = new Date();
+  const stopAt =
+    session.status === "PAUSED" && session.pauseStartedAt
+      ? session.pauseStartedAt
+      : session.endedAt || now;
+  const elapsed = Math.max(
+    0,
+    Math.floor((stopAt.getTime() - session.startedAt.getTime()) / 1000) -
+      session.totalPausedSeconds,
+  );
+
+  return Math.max(0, durationSeconds - elapsed);
+}
+
+export async function notifySessionCompleted(ownerId: string, id: string) {
+  const session = await prisma.gameSession.findUnique({
+    where: { id_ownerId: { id, ownerId } },
+    select: {
+      id: true,
+      ownerId: true,
+      tableId: true,
+      status: true,
+      plannedDurationMinutes: true,
+      startedAt: true,
+      pauseStartedAt: true,
+      endedAt: true,
+      totalPausedSeconds: true,
+      table: { select: { name: true } },
+      primaryCustomer: { select: { name: true } },
+    },
+  });
+
+  if (!session) {
+    throw new SessionModelError("Session not found.", 404);
+  }
+
+  const notificationRows = await prisma.$queryRaw<Array<{ completedNotificationSentAt: Date | null }>>`
+    SELECT "completedNotificationSentAt"
+    FROM game_sessions
+    WHERE id = ${id}
+      AND "ownerId" = ${ownerId}
+    LIMIT 1
+  `;
+
+  if (notificationRows[0]?.completedNotificationSentAt) {
+    return { sent: false, alreadySent: true, reason: "already_sent" as const };
+  }
+
+  if (!["ACTIVE", "PAUSED", "ENDED"].includes(session.status)) {
+    return { sent: false, alreadySent: false, reason: "not_running" as const };
+  }
+
+  if (getSessionRemainingSeconds(session) > 0) {
+    return { sent: false, alreadySent: false, reason: "not_due" as const };
+  }
+
+  const updatedRows = await prisma.$queryRaw<Array<{ id: string }>>`
+    UPDATE game_sessions
+    SET
+      "completedNotificationSentAt" = NOW(),
+      "updatedAt" = NOW()
+    WHERE id = ${id}
+      AND "ownerId" = ${ownerId}
+      AND "completedNotificationSentAt" IS NULL
+      AND status IN ('ACTIVE', 'PAUSED', 'ENDED')
+    RETURNING id
+  `;
+
+  if (updatedRows.length !== 1) {
+    return { sent: false, alreadySent: true, reason: "already_sent" as const };
+  }
+
+  const result = await sendToUser(ownerId, {
+    title: "Session Completed",
+    body: `${session.table.name} (${session.primaryCustomer.name}) has completed its session. Tap to finalize the bill.`,
+    icon: "/icons/cuedesk-icon-192.png",
+    badge: "/icons/cuedesk-icon-192.png",
+    image: "/pool-crm-dashboard.png",
+    url: `/sessions?sessionId=${session.id}`,
+    sessionId: session.id,
+    tableId: session.tableId,
+    customerName: session.primaryCustomer.name,
+  });
+
+  return { sent: result.sent > 0, alreadySent: false, result };
 }
 
 export type SessionHistoryFilters = {
@@ -198,13 +379,20 @@ export function listSessionHistory(ownerId: string, filters: SessionHistoryFilte
   });
 }
 
-export function getSession(ownerId: string, id: string) {
-  return prisma.gameSession.findUnique({
+export async function getSession(ownerId: string, id: string) {
+  const session = await prisma.gameSession.findUnique({
     where: {
       id_ownerId: { id, ownerId },
     },
     select: sessionSummarySelect(),
   });
+
+  if (!session) {
+    return null;
+  }
+
+  const [hydratedSession] = await hydrateSessionExtras([session]);
+  return hydratedSession;
 }
 
 export async function startSession(ownerId: string, data: StartSessionPayload) {
@@ -528,6 +716,7 @@ export async function finalizeSession(ownerId: string, id: string, data: Finaliz
     gameCount: number;
     plannedDurationMinutes: number;
     calculatedAmount: number;
+    addOnAmount: number;
     finalAmount: number;
     status: SessionStatusValue;
     ownerPlaying: boolean;
@@ -537,6 +726,7 @@ export async function finalizeSession(ownerId: string, id: string, data: Finaliz
     totalPausedSeconds: number;
     endedAt: Date;
     finalizedAt: Date;
+    completedNotificationSentAt: Date | null;
     tableName: string;
     tablePricingMode: "PER_HOUR" | "PER_GAME";
     tablePriceCurrent: number;
@@ -638,12 +828,22 @@ export async function finalizeSession(ownerId: string, id: string, data: Finaliz
         CASE
           WHEN session."ownerPlaying" = TRUE AND ${ownerResult}::text = 'OWNER_LOST'
             THEN 0
-          ELSE session."calculatedAmount"
+          ELSE session."calculatedAmount" + session."addOnAmount"
         END AS "computedFinalAmount",
         (SELECT COUNT(*) FROM input_players) AS "inputPlayerCount",
         (SELECT COUNT("customerId") FROM resolved_players) AS "resolvedPlayerCount",
         COALESCE((SELECT SUM("splitAmount") FROM resolved_players), 0) AS "splitTotal",
         COALESCE((SELECT SUM(amount) FROM resolved_payments), 0) AS "paymentTotal",
+        COALESCE((
+          SELECT SUM(
+            CASE
+              WHEN payment.mode = 'PENDING' THEN payment.amount
+              ELSE LEAST(payment.amount, COALESCE(player."splitAmount", payment.amount))
+            END
+          )
+          FROM resolved_payments payment
+          LEFT JOIN resolved_players player ON player."customerId" = payment."customerId"
+        ), 0) AS "sessionPaymentTotal",
         (SELECT COUNT(*) FROM resolved_players) AS "playerCount",
         (SELECT COUNT(DISTINCT "customerId") FROM resolved_players) AS "uniquePlayerCount",
         (SELECT COUNT(*) FROM resolved_payments WHERE "customerId" IS NULL) AS "invalidPaymentCount"
@@ -657,14 +857,7 @@ export async function finalizeSession(ownerId: string, id: string, data: Finaliz
         AND "playerCount" = "uniquePlayerCount"
         AND "invalidPaymentCount" = 0
         AND "splitTotal" = "computedFinalAmount"
-        AND "paymentTotal" = (
-          "computedFinalAmount" +
-          CASE
-            WHEN ${extraPaymentAction}::text = 'WALLET'
-              THEN ${extraAmount}::integer
-            ELSE 0
-          END
-        )
+        AND "sessionPaymentTotal" = "computedFinalAmount"
     ),
     updated_session AS (
       UPDATE "game_sessions" session
@@ -724,9 +917,13 @@ export async function finalizeSession(ownerId: string, id: string, data: Finaliz
         payment."customerId",
         NULL,
         payment.mode::"PaymentMode",
-        payment.amount,
+        CASE
+          WHEN payment.mode = 'PENDING' THEN payment.amount
+          ELSE LEAST(payment.amount, COALESCE(player."splitAmount", payment.amount))
+        END,
         NOW()
       FROM resolved_payments payment
+      LEFT JOIN resolved_players player ON player."customerId" = payment."customerId"
       CROSS JOIN updated_session session
       WHERE payment."customerId" IS NOT NULL
         AND (SELECT COUNT(*) FROM inserted_players) >= 0
@@ -769,11 +966,103 @@ export async function finalizeSession(ownerId: string, id: string, data: Finaliz
       WHERE (SELECT COUNT(*) FROM updated_pending) >= 0
       RETURNING id
     ),
+    overpaid_totals AS (
+      SELECT
+        payment."customerId",
+        SUM(
+          GREATEST(
+            payment.amount - CASE
+              WHEN payment.mode = 'PENDING' THEN payment.amount
+              ELSE COALESCE(player."splitAmount", payment.amount)
+            END,
+            0
+          )
+        )::integer AS amount
+      FROM resolved_payments payment
+      LEFT JOIN resolved_players player ON player."customerId" = payment."customerId"
+      WHERE payment.mode <> 'PENDING'
+      GROUP BY payment."customerId"
+    ),
+    current_pending AS (
+      SELECT
+        customer.id AS "customerId",
+        GREATEST(
+          customer."pendingAmount",
+          COALESCE(
+            SUM(
+              CASE
+                WHEN ledger.type = 'CREATED' THEN ledger.amount
+                WHEN ledger.type = 'PAID' THEN -ledger.amount
+                ELSE 0
+              END
+            ),
+            0
+          )
+        )::integer AS amount
+      FROM customers customer
+      LEFT JOIN pending_ledger ledger
+        ON ledger."customerId" = customer.id
+       AND ledger."ownerId" = ${ownerId}
+      WHERE customer."ownerId" = ${ownerId}
+        AND customer.id IN (SELECT "customerId" FROM overpaid_totals)
+      GROUP BY customer.id, customer."pendingAmount"
+    ),
+    pending_paid_totals AS (
+      SELECT
+        overpaid."customerId",
+        LEAST(overpaid.amount, current_pending.amount)::integer AS amount
+      FROM overpaid_totals overpaid
+      JOIN current_pending ON current_pending."customerId" = overpaid."customerId"
+      WHERE LEAST(overpaid.amount, current_pending.amount) > 0
+    ),
+    updated_existing_pending AS (
+      UPDATE customers customer
+      SET
+        "pendingAmount" = current_pending.amount - paid.amount,
+        "updatedAt" = NOW()
+      FROM pending_paid_totals paid
+      JOIN current_pending ON current_pending."customerId" = paid."customerId"
+      CROSS JOIN updated_session session
+      WHERE customer.id = paid."customerId"
+        AND customer."ownerId" = ${ownerId}
+        AND (SELECT COUNT(*) FROM inserted_pending_ledger) >= 0
+      RETURNING customer.id
+    ),
+    inserted_pending_paid_ledger AS (
+      INSERT INTO pending_ledger (
+        id, "ownerId", "customerId", "sessionId",
+        type, amount, note, "createdAt"
+      )
+      SELECT
+        'l' || md5(random()::text || clock_timestamp()::text || paid."customerId"),
+        ${ownerId},
+        paid."customerId",
+        session.id,
+        'PAID',
+        paid.amount,
+        'Pending amount paid from session payment',
+        NOW()
+      FROM pending_paid_totals paid
+      CROSS JOIN updated_session session
+      WHERE (SELECT COUNT(*) FROM updated_existing_pending) >= 0
+      RETURNING id
+    ),
+    wallet_credit_totals AS (
+      SELECT
+        overpaid."customerId",
+        GREATEST(overpaid.amount - COALESCE(paid.amount, 0), 0)::integer AS amount
+      FROM overpaid_totals overpaid
+      LEFT JOIN pending_paid_totals paid ON paid."customerId" = overpaid."customerId"
+      WHERE GREATEST(overpaid.amount - COALESCE(paid.amount, 0), 0) > 0
+    ),
     wallet_changes AS (
       SELECT "customerId", (-SUM(amount))::integer AS amount, 'DEBIT'::text AS type
       FROM resolved_payments
       WHERE mode = 'WALLET'
       GROUP BY "customerId"
+      UNION ALL
+      SELECT "customerId", amount, 'CREDIT'
+      FROM wallet_credit_totals
       UNION ALL
       SELECT session."primaryCustomerId", ${extraAmount}::integer, 'CREDIT'
       FROM updated_session session
@@ -823,6 +1112,7 @@ export async function finalizeSession(ownerId: string, id: string, data: Finaliz
       WHERE venue.id = session."tableId"
         AND venue."ownerId" = ${ownerId}
         AND (SELECT COUNT(*) FROM inserted_pending_ledger) >= 0
+        AND (SELECT COUNT(*) FROM inserted_pending_paid_ledger) >= 0
         AND (SELECT COUNT(*) FROM inserted_wallet_ledger) >= 0
       RETURNING venue.id
     )
@@ -835,6 +1125,7 @@ export async function finalizeSession(ownerId: string, id: string, data: Finaliz
       session."gameCount",
       session."plannedDurationMinutes",
       session."calculatedAmount",
+      session."addOnAmount",
       session."finalAmount",
       session.status,
       session."ownerPlaying",
@@ -844,6 +1135,7 @@ export async function finalizeSession(ownerId: string, id: string, data: Finaliz
       session."totalPausedSeconds",
       session."endedAt",
       session."finalizedAt",
+      session."completedNotificationSentAt",
       venue.name AS "tableName",
       venue."pricingMode" AS "tablePricingMode",
       venue.price AS "tablePriceCurrent",
@@ -887,6 +1179,7 @@ export async function finalizeSession(ownerId: string, id: string, data: Finaliz
     gameCount: row.gameCount,
     plannedDurationMinutes: row.plannedDurationMinutes,
     calculatedAmount: row.calculatedAmount,
+    addOnAmount: row.addOnAmount,
     finalAmount: row.finalAmount,
     status: row.status,
     ownerPlaying: row.ownerPlaying,
@@ -896,6 +1189,7 @@ export async function finalizeSession(ownerId: string, id: string, data: Finaliz
     totalPausedSeconds: row.totalPausedSeconds,
     endedAt: row.endedAt,
     finalizedAt: row.finalizedAt,
+    completedNotificationSentAt: row.completedNotificationSentAt,
     table: {
       id: row.tableId,
       name: row.tableName,

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { PwaInstallButton } from "@/components/pwa-install-button";
 
 type NavItem = {
   label: string;
@@ -10,6 +11,7 @@ type NavItem = {
 
 export function MobileNav({ items }: { items: NavItem[] }) {
   const [open, setOpen] = useState(false);
+  const closeMenu = () => setOpen(false);
 
   return (
     <div className="md:hidden">
@@ -28,54 +30,66 @@ export function MobileNav({ items }: { items: NavItem[] }) {
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-[999] h-dvh w-screen overflow-hidden bg-zinc-950/60 backdrop-blur-sm">
           <button
             type="button"
             aria-label="Close navigation backdrop"
-            className="absolute inset-0 bg-zinc-950/25"
-            onClick={() => setOpen(false)}
+            className="absolute inset-0"
+            onClick={closeMenu}
           />
-          <aside className="absolute right-0 top-0 flex h-full w-[min(22rem,86vw)] flex-col border-l border-zinc-200 bg-white p-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-zinc-950">CueDesk CRM</p>
-                <p className="text-xs text-zinc-500">Pool and snooker CRM</p>
-              </div>
-              <button
-                type="button"
-                aria-label="Close navigation menu"
-                onClick={() => setOpen(false)}
-                className="grid size-10 place-items-center rounded-md border border-zinc-300 text-2xl leading-none text-zinc-700"
-              >
-                x
-              </button>
-            </div>
-
-            <div className="mt-8 flex flex-col gap-1">
-              {items.map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className="rounded-md px-3 py-3 text-base font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950"
+          <aside className="absolute inset-y-0 right-0 z-[1000] flex h-dvh w-[86vw] max-w-[22rem] flex-col overflow-hidden border-l border-zinc-200 bg-white text-zinc-950 shadow-2xl shadow-zinc-950/30">
+            <div className="border-b border-zinc-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Link href="/" onClick={closeMenu} className="flex min-w-0 items-center gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-zinc-950 text-sm font-bold text-white">
+                    CD
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-zinc-950">CueDesk CRM</span>
+                    <span className="block truncate text-xs font-medium text-zinc-500">
+                      Pool and snooker CRM
+                    </span>
+                  </span>
+                </Link>
+                <button
+                  type="button"
+                  aria-label="Close navigation menu"
+                  onClick={closeMenu}
+                  className="grid size-10 shrink-0 place-items-center rounded-lg border border-zinc-300 bg-white text-xl font-semibold leading-none text-zinc-700 shadow-sm transition hover:bg-zinc-100"
                 >
-                  {item.label}
-                </a>
-              ))}
+                  X
+                </button>
+              </div>
             </div>
 
-            <div className="mt-auto grid gap-3 border-t border-zinc-200 pt-5">
+            <div className="flex-1 overflow-y-auto bg-white p-4">
+              <div className="grid gap-2">
+                {items.map((item) => (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    onClick={closeMenu}
+                    className="flex min-h-12 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-4 text-sm font-semibold text-zinc-800 shadow-sm transition hover:border-[#3195EF]/40 hover:bg-[#3195EF]/10 hover:text-[#126ec1]"
+                  >
+                    {item.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 border-t border-zinc-200 bg-white p-4">
+              <PwaInstallButton className="h-11 w-full rounded-lg" />
               <Link
-                href="/register"
-                onClick={() => setOpen(false)}
-                className="inline-flex h-11 items-center justify-center rounded-md border border-zinc-300 text-sm font-semibold text-zinc-800"
+                href="/login"
+                onClick={closeMenu}
+                className="inline-flex h-11 items-center justify-center rounded-lg border border-zinc-300 bg-white text-sm font-semibold text-zinc-800 shadow-sm transition hover:bg-zinc-100"
               >
                 Login
               </Link>
               <Link
-                href="/login"
-                onClick={() => setOpen(false)}
-                className="inline-flex h-11 items-center justify-center rounded-md bg-[#3195EF] text-sm font-semibold text-white"
+                href="/register"
+                onClick={closeMenu}
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-[#3195EF] text-sm font-semibold text-white shadow-sm shadow-[#3195EF]/25 transition hover:opacity-90"
               >
                 Try Our Free Tier
               </Link>

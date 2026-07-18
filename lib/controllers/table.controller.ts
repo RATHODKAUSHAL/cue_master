@@ -3,6 +3,7 @@ import {
   deleteTable,
   listAvailableTables,
   listTables,
+  TableModelError,
   updateTable,
   type TablePayload,
 } from "@/lib/models/table.model";
@@ -27,6 +28,10 @@ function getPrismaErrorCode(error: unknown) {
 
 function isRecordNotFoundError(error: unknown) {
   return getPrismaErrorCode(error) === "P2025";
+}
+
+function isForeignKeyError(error: unknown) {
+  return getPrismaErrorCode(error) === "P2003";
 }
 
 function normalizeTableInput(input: TableInput) {
@@ -124,10 +129,24 @@ export async function deleteTableForUser(ownerId: string, id: string) {
     await deleteTable(ownerId, id);
     return { ok: true as const };
   } catch (error) {
-    if (!isRecordNotFoundError(error)) {
-      return { ok: false as const, status: 500, message: "Unable to delete table." };
+    if (error instanceof TableModelError) {
+      return { ok: false as const, status: error.status, message: error.message };
     }
 
-    return { ok: false as const, status: 404, message: "Table not found." };
+    if (isRecordNotFoundError(error)) {
+      return { ok: false as const, status: 404, message: "Table not found." };
+    }
+
+    if (isForeignKeyError(error)) {
+      return {
+        ok: false as const,
+        status: 409,
+        message: "This table is linked to sessions and cannot be deleted.",
+      };
+    }
+
+    console.error("Unable to delete table", error);
+
+    return { ok: false as const, status: 500, message: "Unable to delete table." };
   }
 }

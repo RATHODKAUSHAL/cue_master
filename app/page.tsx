@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { MobileNav } from "@/components/mobile-nav";
+import { PwaInstallButton } from "@/components/pwa-install-button";
 
 const navItems = [
   { label: "About", href: "#about" },
@@ -99,6 +100,7 @@ export default function Home() {
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
+            <PwaInstallButton className="h-10 rounded-md bg-[#337418] px-4" />
             <Link href="/login" className="text-sm font-medium text-zinc-700 hover:text-zinc-950">
               Login
             </Link>

@@ -8,6 +8,16 @@ export type TablePayload = {
   durationMinutes?: number | null;
 };
 
+export class TableModelError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "TableModelError";
+  }
+}
+
 export function listTables(ownerId: string) {
   return prisma.venueTable.findMany({
     where: { ownerId },
@@ -55,9 +65,44 @@ export function updateTable(ownerId: string, id: string, data: TablePayload) {
 }
 
 export function deleteTable(ownerId: string, id: string) {
-  return prisma.venueTable.delete({
-    where: {
-      id_ownerId: { id, ownerId },
-    },
+  return prisma.$transaction(async (tx) => {
+    const table = await tx.venueTable.findUnique({
+      where: {
+        id_ownerId: { id, ownerId },
+      },
+      select: {
+        id: true,
+        status: true,
+        _count: {
+          select: {
+            sessions: true,
+          },
+        },
+      },
+    });
+
+    if (!table) {
+      throw new TableModelError("Table not found.", 404);
+    }
+
+    if (table.status === "OCCUPIED") {
+      throw new TableModelError(
+        "This table has an active session. Finalise or delete the session before deleting the table.",
+        409,
+      );
+    }
+
+    if (table._count.sessions > 0) {
+      throw new TableModelError(
+        "This table is linked to session history and cannot be deleted.",
+        409,
+      );
+    }
+
+    return tx.venueTable.delete({
+      where: {
+        id_ownerId: { id, ownerId },
+      },
+    });
   });
 }

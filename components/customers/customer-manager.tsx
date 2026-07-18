@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DashboardIcon } from "@/components/dashboard/dashboard-shell";
+import { Plus, X } from "lucide-react";
 import { userFetch } from "@/lib/auth/client";
 import {
   Table,
@@ -72,7 +72,7 @@ type CustomerProfile = {
 };
 
 const fieldClass =
-  "h-11 rounded-md border border-zinc-300 bg-white px-3 outline-none transition focus:border-[#3195EF] focus:ring-2 focus:ring-[#3195EF]/15";
+  "h-11 rounded-md border border-zinc-300 bg-white px-3 outline-none transition focus:border-[#337418] focus:ring-2 focus:ring-[#337418]/15";
 
 function money(amount: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -279,45 +279,115 @@ export function CustomerManager() {
 
   return (
     <>
-      <Card className="min-h-[calc(100vh-8rem)] overflow-hidden rounded-xl bg-white">
-        <CardHeader className="flex-col border-b border-zinc-200 p-5 sm:flex-row sm:items-center sm:p-6">
+      <Card className="-m-4 min-h-[calc(100vh-4rem)] overflow-hidden rounded-[1.5rem] border border-brand-green bg-white text-zinc-800 shadow-xs sm:-m-6 lg:m-0 lg:min-h-[calc(100vh-8rem)]">
+        <CardHeader className="m-4 flex-col rounded-[1.35rem] border border-[#337418]/15 bg-[#f4ebe1]/30 p-4 shadow-sm sm:m-6 sm:flex-row sm:items-center sm:rounded-[1.75rem] sm:p-6">
           <div>
-            <CardTitle className="text-2xl">Customers</CardTitle>
-            <p className="mt-2 text-sm text-zinc-500">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#337418] sm:text-xs">Customers</p>
+            <CardTitle className="mt-2 text-2xl font-extrabold text-zinc-950">Customers</CardTitle>
+            <p className="mt-2 text-sm font-medium text-zinc-500">
               View every customer, search details, and add new players.
             </p>
           </div>
-          <Button onClick={openCreateModal}>
-            <DashboardIcon name="plus" className="size-4" />
+          <Button className="bg-[#337418] text-[#F8F8F8] hover:bg-[#337418]" onClick={openCreateModal}>
+            <Plus aria-hidden="true" strokeWidth={1.8} className="size-4 shrink-0" />
             Add Customer
           </Button>
         </CardHeader>
 
-        <CardContent className="p-4 sm:p-6">
+        <CardContent className="p-3 pb-24 sm:p-6 sm:pb-28">
           <form
-            className="mb-5 grid gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
+            className="mb-4 grid gap-3 rounded-2xl border border-[#337418]/15 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto_auto]"
             onSubmit={searchCustomers}
           >
             <input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              className={fieldClass}
+              className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-[#337418] focus:ring-2 focus:ring-[#337418]/15"
               placeholder="Search by customer name or mobile number"
               aria-label="Search customers"
             />
-            <Button type="submit">Search</Button>
-            <Button type="button" variant="outline" onClick={clearSearch}>
+            <Button className="bg-[#337418] text-[#F8F8F8] hover:bg-[#337418]" type="submit">Search</Button>
+            <Button type="button" variant="outline" className="border-[#337418]/20 bg-white text-[#337418] hover:bg-[#337418]/10 hover:text-[#337418]" onClick={clearSearch}>
               Clear
             </Button>
           </form>
 
           {activeSearch ? (
             <p className="mb-3 text-sm text-zinc-500">
-              Showing results for <span className="font-semibold text-zinc-800">{activeSearch}</span>
+              Showing results for <span className="font-semibold text-zinc-950">{activeSearch}</span>
             </p>
           ) : null}
 
-          <div className="overflow-x-auto rounded-lg border border-zinc-200">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {loading ? (
+              Array.from({ length: 6 }, (_, index) => (
+                <div key={index} className="h-44 animate-pulse rounded-2xl border border-[#337418]/15 bg-zinc-100" />
+              ))
+            ) : error ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-sm font-semibold text-red-700 md:col-span-2 xl:col-span-3">
+                {error}
+              </div>
+            ) : customers.length ? (
+              customers.map((customer) => (
+                <article key={customer.id} className="rounded-[1.15rem] border-2 border-[#337418] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition hover:shadow-[0_12px_38px_rgba(51,116,24,0.06)] sm:rounded-[1.55rem]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-lg font-extrabold text-zinc-950">{customer.name}</h2>
+                      <p className="mt-1 text-xs font-semibold text-zinc-500">{customer.mobileNumber}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-extrabold ${customer.pendingAmount > 0 ? "bg-red-50 text-red-600" : "bg-[#337418]/15 text-[#337418]"}`}>
+                      {customer.pendingAmount > 0 ? "Pending" : "Clear"}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3 border-t border-zinc-100 pt-4 text-sm">
+                    <div>
+                      <p className="text-zinc-400">Pending</p>
+                      <p className={`mt-1 font-bold ${customer.pendingAmount > 0 ? "text-red-600" : "text-[#337418]"}`}>{money(customer.pendingAmount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-zinc-400">Wallet</p>
+                      <p className="mt-1 font-bold text-zinc-900">{money(customer.walletBalance)}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-zinc-400">Recent Pending Entry</p>
+                      <p className="mt-1 font-bold text-zinc-900">
+                        {customer.pendingEntries[0]
+                          ? `${money(customer.pendingEntries[0].amount)} - ${new Date(customer.pendingEntries[0].createdAt).toLocaleDateString("en-IN")}`
+                          : "-"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {customer.pendingAmount > 0 ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700"
+                        onClick={() => openPendingPayment(customer)}
+                      >
+                        Pay Pending
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      className="bg-[#337418] text-[#F8F8F8] hover:bg-[#337418]"
+                      onClick={() => openCustomerProfile(customer.id)}
+                    >
+                      Profile
+                    </Button>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-[#337418]/15 bg-white p-8 text-center text-sm font-semibold text-zinc-500 shadow-sm md:col-span-2 xl:col-span-3">
+                No customers found.
+              </div>
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-zinc-200">
             <Table className="min-w-[1040px]">
               <TableHeader>
                 <TableRow>
@@ -422,11 +492,11 @@ export function CustomerManager() {
       </Card>
 
       {modalOpen ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-950/40 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-zinc-200 bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b border-zinc-200 p-5">
+        <div className="fixed inset-0 z-50 grid items-end bg-zinc-950/60 px-0 backdrop-blur-sm sm:place-items-center sm:px-4">
+          <div className="max-h-[92dvh] w-full overflow-hidden rounded-t-[1.75rem] border border-[#337418]/25 bg-white shadow-2xl sm:max-w-lg sm:rounded-[1.5rem]">
+            <div className="flex items-start justify-between border-b border-[#337418]/15 bg-[#F4F6E9] p-5 text-zinc-950">
               <div>
-                <h2 className="text-lg font-semibold">Add Customer</h2>
+                <h2 className="text-lg font-extrabold">Add Customer</h2>
                 <p className="mt-1 text-sm text-zinc-500">
                   Add the customer name and 10-digit mobile number.
                 </p>
@@ -436,8 +506,9 @@ export function CustomerManager() {
                 size="icon"
                 onClick={() => setModalOpen(false)}
                 aria-label="Close customer form"
+                className="rounded-xl text-zinc-500 hover:bg-[#337418]/10 hover:text-[#337418]"
               >
-                <DashboardIcon name="close" className="size-4" />
+                <X aria-hidden="true" strokeWidth={1.8} className="size-4 shrink-0" />
               </Button>
             </div>
 
@@ -471,10 +542,10 @@ export function CustomerManager() {
               {formError ? <p className="text-sm font-medium text-red-600">{formError}</p> : null}
 
               <div className="flex justify-end gap-3 pt-2">
-                <Button variant="outline" onClick={() => setModalOpen(false)}>
+                <Button variant="outline" className="h-11 rounded-xl" onClick={() => setModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={saving}>
+                <Button className="h-11 rounded-xl bg-[#337418] text-[#F8F8F8] hover:bg-[#337418]" type="submit" disabled={saving}>
                   {saving ? "Adding..." : "Add Customer"}
                 </Button>
               </div>
@@ -484,11 +555,11 @@ export function CustomerManager() {
       ) : null}
 
       {payingCustomer ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-950/40 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-zinc-200 bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b border-zinc-200 p-5">
+        <div className="fixed inset-0 z-50 grid items-end bg-zinc-950/60 px-0 backdrop-blur-sm sm:place-items-center sm:px-4">
+          <div className="max-h-[92dvh] w-full overflow-hidden rounded-t-[1.75rem] border border-[#337418]/25 bg-white shadow-2xl sm:max-w-lg sm:rounded-[1.5rem]">
+            <div className="flex items-start justify-between border-b border-[#337418]/15 bg-[#F4F6E9] p-5 text-zinc-950">
               <div>
-                <h2 className="text-lg font-semibold">Pay Pending Amount</h2>
+                <h2 className="text-lg font-extrabold">Pay Pending Amount</h2>
                 <p className="mt-1 text-sm text-zinc-500">
                   {payingCustomer.name} currently owes {money(payingCustomer.pendingAmount)}.
                 </p>
@@ -498,8 +569,9 @@ export function CustomerManager() {
                 size="icon"
                 onClick={() => setPayingCustomer(null)}
                 aria-label="Close pending payment form"
+                className="rounded-xl text-zinc-500 hover:bg-[#337418]/10 hover:text-[#337418]"
               >
-                <DashboardIcon name="close" className="size-4" />
+                <X aria-hidden="true" strokeWidth={1.8} className="size-4 shrink-0" />
               </Button>
             </div>
 
@@ -547,10 +619,10 @@ export function CustomerManager() {
               ) : null}
 
               <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setPayingCustomer(null)}>
+                <Button variant="outline" className="h-11 rounded-xl" onClick={() => setPayingCustomer(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={paymentSaving}>
+                <Button className="h-11 rounded-xl bg-[#337418] text-[#F8F8F8] hover:bg-[#337418]" type="submit" disabled={paymentSaving}>
                   {paymentSaving ? "Paying..." : "Pay"}
                 </Button>
               </div>
@@ -567,11 +639,11 @@ export function CustomerManager() {
             aria-label="Close customer profile"
             onClick={closeCustomerProfile}
           />
-          <aside className="absolute inset-y-0 right-0 w-full overflow-y-auto border-l border-blue-100 bg-[#f7fbff] shadow-2xl sm:w-[70vw] lg:w-[65vw]">
-            <div className="sticky top-0 z-20 flex items-start justify-between border-b border-blue-100 bg-white/90 p-5 backdrop-blur-xl sm:p-6">
+          <aside className="absolute inset-y-0 right-0 w-full overflow-y-auto border-l border-[#337418]/20 bg-[#F8F8F8] shadow-2xl sm:w-[70vw] lg:w-[65vw]">
+            <div className="sticky top-0 z-20 flex items-start justify-between border-b border-[#337418]/15 bg-white/95 p-5 backdrop-blur-xl sm:p-6">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
+                  <span className="size-2 rounded-full bg-[#337418] shadow-[0_0_0_4px_rgba(51,116,24,0.12)]" />
                   <h2 className="text-xl font-semibold">Customer Profile</h2>
                 </div>
                 <p className="mt-1 text-sm text-zinc-500">Live customer activity overview</p>
@@ -583,7 +655,7 @@ export function CustomerManager() {
                 aria-label="Close customer profile"
                 className="rounded-full border border-zinc-200 bg-white shadow-sm transition hover:rotate-90 hover:bg-red-50 hover:text-red-600"
               >
-                <DashboardIcon name="close" className="size-5" />
+                <X aria-hidden="true" strokeWidth={1.8} className="size-5 shrink-0" />
               </Button>
             </div>
 
@@ -605,12 +677,10 @@ export function CustomerManager() {
                 </div>
               ) : profile ? (
                 <div className="space-y-6">
-                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#126ec1] via-[#3195EF] to-cyan-400 p-5 text-white shadow-lg shadow-blue-200/70 sm:p-6">
-                    <div className="absolute -right-12 -top-16 size-48 rounded-full bg-white/10" />
-                    <div className="absolute -bottom-20 right-20 size-40 rounded-full bg-cyan-100/15" />
+                  <div className="relative overflow-hidden rounded-2xl border border-[#337418]/20 bg-white p-5 text-zinc-950 shadow-sm sm:p-6">
                     <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="grid size-16 shrink-0 place-items-center rounded-2xl border border-white/30 bg-white/20 text-xl font-bold shadow-inner backdrop-blur">
+                        <div className="grid size-16 shrink-0 place-items-center rounded-2xl border border-[#337418]/20 bg-[#337418]/10 text-xl font-bold text-[#337418]">
                           {profile.name
                             .split(" ")
                             .map((part) => part[0])
@@ -620,8 +690,8 @@ export function CustomerManager() {
                         </div>
                         <div>
                           <p className="text-2xl font-semibold">{profile.name}</p>
-                          <p className="mt-1 text-sm text-blue-50">{profile.mobileNumber}</p>
-                          <p className="mt-2 text-xs text-blue-100">
+                          <p className="mt-1 text-sm text-zinc-500">{profile.mobileNumber}</p>
+                          <p className="mt-2 text-xs text-zinc-400">
                             Member since{" "}
                             {new Date(profile.createdAt).toLocaleDateString("en-IN", {
                               day: "2-digit",
@@ -634,8 +704,8 @@ export function CustomerManager() {
                       <span
                         className={`w-fit rounded-full border px-3 py-1.5 text-xs font-semibold backdrop-blur ${
                           profile.pendingAmount > 0
-                            ? "border-amber-200/60 bg-amber-300/20 text-amber-50"
-                            : "border-emerald-200/60 bg-emerald-300/20 text-emerald-50"
+                            ? "border-red-200 bg-red-50 text-red-600"
+                            : "border-[#337418]/20 bg-[#337418]/10 text-[#337418]"
                         }`}
                       >
                         {profile.pendingAmount > 0
@@ -645,7 +715,7 @@ export function CustomerManager() {
                     </div>
                   </div>
 
-                  <div className="flex gap-1 overflow-x-auto rounded-xl border border-blue-100 bg-white p-1.5 shadow-sm">
+                  <div className="flex gap-1 overflow-x-auto rounded-xl border border-[#337418]/15 bg-white p-1.5 shadow-sm">
                     {[
                       ["overview", "Overview"],
                       ["games", "Game History"],
@@ -659,8 +729,8 @@ export function CustomerManager() {
                         }
                         className={`min-w-fit flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
                           profileTab === value
-                            ? "bg-[#3195EF] text-white shadow-md shadow-blue-200"
-                            : "text-zinc-500 hover:bg-blue-50 hover:text-[#126ec1]"
+                            ? "bg-[#337418] text-white shadow-md shadow-[#337418]/15"
+                            : "text-zinc-500 hover:bg-[#337418]/10 hover:text-[#337418]"
                         }`}
                       >
                         {label}
@@ -693,6 +763,15 @@ export function CustomerManager() {
                             ? "border-amber-100 bg-amber-50 text-amber-700"
                             : "border-emerald-100 bg-emerald-50 text-emerald-700",
                       },
+                      ...(profile.walletBalance > 0
+                        ? [
+                            {
+                              label: "Advance",
+                              value: money(profile.walletBalance),
+                              colors: "border-emerald-100 bg-emerald-50 text-emerald-700",
+                            },
+                          ]
+                        : []),
                     ].map((metric) => (
                       <div
                         key={metric.label}
@@ -792,7 +871,9 @@ export function CustomerManager() {
                             ),
                             "text-emerald-700",
                           ],
-                          ["Wallet balance", money(profile.walletBalance), "text-blue-700"],
+                          ...(profile.walletBalance > 0
+                            ? [["Advance amount", money(profile.walletBalance), "text-blue-700"]]
+                            : []),
                         ].map(([label, value, color]) => (
                           <div
                             key={label}

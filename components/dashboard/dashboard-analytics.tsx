@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { userFetch } from "@/lib/auth/client";
 
 type Period = "day" | "week" | "month";
@@ -16,7 +14,6 @@ type Analytics = {
   totalPendingAmount: number;
   totalExpense: number;
   completedSessions: number;
-  chart: Array<{ label: string; value: number }>;
 };
 
 function indiaToday() {
@@ -41,98 +38,8 @@ function DashboardSkeleton() {
     <div className="animate-pulse">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, index) => (
-          <div key={index} className="h-32 rounded-lg bg-zinc-100" />
+          <div key={index} className="h-28 rounded-2xl border border-zinc-200 bg-zinc-100" />
         ))}
-      </div>
-      <div className="mt-6 h-96 rounded-lg bg-zinc-100" />
-    </div>
-  );
-}
-
-function RevenueChart({ points }: { points: Analytics["chart"] }) {
-  const width = 900;
-  const height = 280;
-  const paddingX = 35;
-  const paddingY = 28;
-  const max = Math.max(...points.map((point) => point.value), 1);
-  const chartWidth = width - paddingX * 2;
-  const chartHeight = height - paddingY * 2;
-  const coordinates = points.map((point, index) => {
-    const x =
-      paddingX +
-      (points.length === 1 ? chartWidth / 2 : (index / (points.length - 1)) * chartWidth);
-    const y = paddingY + chartHeight - (point.value / max) * chartHeight;
-    return { ...point, x, y };
-  });
-  const line = coordinates.map((point) => `${point.x},${point.y}`).join(" ");
-  const area = coordinates.length
-    ? `${paddingX},${height - paddingY} ${line} ${
-        coordinates[coordinates.length - 1].x
-      },${height - paddingY}`
-    : "";
-  const labelStep = Math.max(1, Math.ceil(points.length / 10));
-
-  return (
-    <div>
-      <div className="h-72 w-full">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" role="img">
-          <defs>
-            <linearGradient id="dashboardRevenueFill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#3195EF" stopOpacity="0.28" />
-              <stop offset="100%" stopColor="#3195EF" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-            const y = paddingY + ratio * chartHeight;
-            return (
-              <line
-                key={ratio}
-                x1={paddingX}
-                x2={width - paddingX}
-                y1={y}
-                y2={y}
-                stroke="#e4e4e7"
-                strokeDasharray="4 6"
-              />
-            );
-          })}
-          {area ? <polygon points={area} fill="url(#dashboardRevenueFill)" /> : null}
-          {line ? (
-            <polyline
-              points={line}
-              fill="none"
-              stroke="#3195EF"
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ) : null}
-          {coordinates.map((point, index) => (
-            <circle
-              key={`${point.label}-${index}`}
-              cx={point.x}
-              cy={point.y}
-              r="4"
-              fill="#3195EF"
-            >
-              <title>
-                {point.label}: {money(point.value)}
-              </title>
-            </circle>
-          ))}
-        </svg>
-      </div>
-      <div
-        className="grid gap-1 text-center text-[11px] text-zinc-500"
-        style={{
-          gridTemplateColumns: `repeat(${Math.min(points.length, 10)}, minmax(0, 1fr))`,
-        }}
-      >
-        {points
-          .filter((_, index) => index % labelStep === 0)
-          .map((point) => (
-            <span key={point.label}>{point.label}</span>
-          ))}
       </div>
     </div>
   );
@@ -228,37 +135,42 @@ export function DashboardAnalytics({
     : [];
 
   return (
-    <Card className="min-h-[calc(100vh-8rem)] overflow-hidden rounded-xl bg-white">
-      <div className="p-4 sm:p-6 lg:p-8">
+    <section className="-m-3 min-h-[calc(100vh-4rem)] border border-brand-green bg-white p-4 pb-24 rounded-[1.5rem] shadow-xs text-zinc-800 sm:-m-6 sm:p-6 sm:pb-28 lg:m-0 lg:min-h-[calc(100vh-8rem)] lg:p-6">
+      <div className="grid gap-4">
         <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold sm:text-3xl">
+            <h1 className="text-2xl font-extrabold tracking-tight text-[#337418] sm:text-3xl">
               {greeting}, {userName}
             </h1>
-            <p className="mt-2 text-sm text-zinc-500">
-              Live financial and customer analytics for your club.
-            </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {(["day", "week", "month"] as Period[]).map((value) => (
-              <Button
-                key={value}
-                size="sm"
-                variant={period === value ? "default" : "outline"}
-                onClick={() => changePeriod(value)}
-              >
-                {value === "day" ? "Date" : value === "week" ? "Week" : "Month"}
-              </Button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-xl border border-zinc-200 bg-zinc-50 p-1">
+              {(["day", "week", "month"] as Period[]).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => changePeriod(value)}
+                  className={`h-8 rounded-lg px-3 text-xs font-bold transition-all ${
+                    period === value
+                      ? "bg-[#337418] text-white shadow-xs"
+                      : "text-zinc-500 hover:text-zinc-800"
+                  }`}
+                >
+                  {value === "day" ? "Date" : value === "week" ? "Week" : "Month"}
+                </button>
+              ))}
+            </div>
+
             <input
               type="date"
               value={date}
               onChange={(event) => changeDate(event.target.value)}
-              className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none focus:border-[#3195EF]"
+              className="h-9 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-805 outline-none focus:border-[#337418] transition"
+              aria-label="Change report date"
             />
             <Link
               href="/sessions"
-              className="inline-flex h-9 items-center rounded-md bg-[#3195EF] px-4 text-sm font-semibold text-white"
+              className="inline-flex h-9 items-center justify-center glass-btn-biscuit rounded-xl text-center text-sm font-bold shadow-xs px-4"
             >
               New Session
             </Link>
@@ -270,40 +182,26 @@ export function DashboardAnalytics({
             <DashboardSkeleton />
           </div>
         ) : error ? (
-          <div className="mt-8 rounded-lg border border-red-200 bg-red-50 p-5 text-red-700">
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 font-semibold">
             {error}
           </div>
         ) : analytics ? (
-          <>
-            <section className={`mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4 ${loading ? "opacity-60" : ""}`}>
-              {stats.map((stat) => (
-                <Card key={stat.title} className="shadow-none">
-                  <CardContent className="p-5">
-                    <p className="text-sm text-zinc-500">{stat.title}</p>
-                    <p className="mt-3 text-2xl font-semibold">{stat.value}</p>
-                    <p className="mt-2 text-xs text-zinc-500">{stat.note}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </section>
-
-            <Card className={`mt-6 shadow-none ${loading ? "opacity-60" : ""}`}>
-              <CardHeader className="border-b border-zinc-100">
+          <section className={`grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mt-2 ${loading ? "opacity-60" : ""}`}>
+            {stats.map((stat) => (
+              <article
+                key={stat.title}
+                className="rounded-2xl border border-[#337418]/15 bg-gradient-to-br from-[#337418] to-[#265912] p-5 shadow-md shadow-brand-green/5 text-white flex flex-col justify-between transition-transform duration-200 hover:-translate-y-0.5"
+              >
                 <div>
-                  <CardTitle>Revenue Chart</CardTitle>
-                  <p className="mt-1 text-sm text-zinc-500">
-                    Collected Cash, UPI, Wallet, and cleared pending payments.
-                  </p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">{stat.title}</p>
+                  <p className="mt-3 truncate text-3xl font-extrabold tracking-tight text-white">{stat.value}</p>
                 </div>
-                <p className="text-xl font-semibold">{money(analytics.totalRevenue)}</p>
-              </CardHeader>
-              <CardContent className="p-5">
-                <RevenueChart points={analytics.chart} />
-              </CardContent>
-            </Card>
-          </>
+                <p className="mt-4 text-xs font-medium text-white/80 border-t border-white/10 pt-3">{stat.note}</p>
+              </article>
+            ))}
+          </section>
         ) : null}
       </div>
-    </Card>
+    </section>
   );
 }

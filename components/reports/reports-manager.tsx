@@ -1,18 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { userFetch } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
+import { userFetch } from "@/lib/auth/client";
 
 type ReportMode = "customers" | "sessions";
 
@@ -42,9 +34,6 @@ type Report = {
     totalPendingAmount: number;
   };
 };
-
-const fieldClass =
-  "h-11 rounded-md border border-zinc-300 bg-white px-3 outline-none transition focus:border-[#3195EF] focus:ring-2 focus:ring-[#3195EF]/15";
 
 function money(amount: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -82,6 +71,7 @@ function downloadExcel(filename: string, headers: string[], rows: Array<Array<st
 }
 
 export function ReportsManager() {
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<ReportMode>("customers");
   const [date, setDate] = useState("");
   const [report, setReport] = useState<Report>({
@@ -149,6 +139,16 @@ export function ReportsManager() {
     void loadReport(nextDate);
   }
 
+  function openDatePicker() {
+    const picker = dateInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null;
+    if (picker?.showPicker) {
+      picker.showPicker();
+      return;
+    }
+    picker?.focus();
+    picker?.click();
+  }
+
   async function exportActiveReport() {
     setExporting(true);
     setError("");
@@ -195,90 +195,101 @@ export function ReportsManager() {
   }
 
   return (
-    <div className="grid gap-5">
-      <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-200/50 sm:p-5">
-        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-normal text-zinc-950">Reports</h1>
-            <p className="mt-1 text-sm text-zinc-500">
-              {exportLabel} ready for review and Excel export.
-            </p>
+    <section className="-m-4 min-h-[calc(100vh-4rem)] rounded-[1.5rem] border border-brand-green bg-white p-3 pb-24 text-zinc-800 shadow-xs sm:-m-6 sm:p-5 sm:pb-28 lg:m-0 lg:min-h-[calc(100vh-8rem)] lg:p-5">
+      <div className="grid gap-3">
+        <div className="rounded-[1.25rem] border border-[#337418]/15 bg-[#f4ebe1]/25 p-4 shadow-sm sm:rounded-[1.5rem]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#337418]">Reports</p>
+              <h1 className="mt-1 text-2xl font-extrabold tracking-normal text-zinc-950">Reports</h1>
+            </div>
+            <Button
+              type="button"
+              size="icon"
+              className="size-11 shrink-0 rounded-full bg-[#337418] text-white shadow-sm hover:bg-[#2b6414]"
+              onClick={exportActiveReport}
+              disabled={loading || exporting}
+              aria-label={exporting ? "Exporting report" : "Export report to Excel"}
+              title={exporting ? "Exporting..." : "Export file"}
+            >
+              <FileSpreadsheet aria-hidden="true" className="size-5" strokeWidth={2} />
+            </Button>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[220px_auto_auto]">
-            <input
-              type="date"
-              value={date}
-              onChange={(event) => changeReportDate(event.target.value)}
-              className={fieldClass}
-              aria-label="Change report date"
-            />
+          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-[#337418]/15 bg-white p-2 shadow-[0_6px_18px_rgba(0,0,0,0.03)]">
+            <div className="relative shrink-0">
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="size-10 rounded-xl border-[#337418]/20 bg-white text-[#337418] hover:bg-[#337418]/10 hover:text-[#337418]"
+                onClick={openDatePicker}
+                aria-label="Select report date"
+                title="Select date"
+              >
+                <CalendarDays aria-hidden="true" className="size-4" strokeWidth={2.2} />
+              </Button>
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={date}
+                onChange={(event) => changeReportDate(event.target.value)}
+                className="pointer-events-none absolute inset-0 size-10 opacity-0"
+                aria-label="Change report date"
+                tabIndex={-1}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-extrabold text-zinc-950">
+                {date ? new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                }) : "All dates"}
+              </p>
+              <p className="text-xs font-medium text-zinc-400">
+                {date ? "Filtered report" : "Tap calendar to filter"}
+              </p>
+            </div>
             <Button
               type="button"
               variant="outline"
+              className="h-10 rounded-xl border-[#337418]/20 bg-white px-4 text-sm font-extrabold text-[#337418] hover:bg-[#337418]/10 hover:text-[#337418]"
               onClick={() => changeReportDate("")}
               disabled={!date || loading}
             >
-              Clear Date
-            </Button>
-            <Button type="button" onClick={exportActiveReport} disabled={loading || exporting}>
-              {exporting ? "Exporting..." : "Export Excel"}
+              Clear
             </Button>
           </div>
         </div>
-      </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
-        <div className="overflow-hidden rounded-lg border border-emerald-100 bg-white shadow-sm shadow-zinc-200/50">
-          <div className="flex items-center justify-between gap-4 p-5">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-emerald-700">Total Revenue</p>
-              <p className="mt-2 truncate text-3xl font-semibold text-zinc-950">
-                {money(report.totals.totalRevenue)}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                {date ? "Collected on selected date" : "Collected across all records"}
-              </p>
-            </div>
-            <div className="grid size-12 shrink-0 place-items-center rounded-md bg-emerald-50 text-sm font-semibold text-emerald-700">
-              Rs
-            </div>
-          </div>
-        </div>
+        <section className="grid gap-3 md:grid-cols-2">
+          {[
+            ["Total Revenue", money(report.totals.totalRevenue), date ? "Collected on selected date" : "Collected across all records"],
+            ["Total Pending Amount", money(report.totals.totalPendingAmount), "Current customer due balance"],
+          ].map(([label, value, note]) => (
+            <article key={label} className="rounded-[1.15rem] border-2 border-[#337418] bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.035)] sm:rounded-[1.35rem]">
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-zinc-400">{label}</p>
+              <p className="mt-2 truncate text-[1.7rem] font-extrabold leading-tight text-[#337418]">{value}</p>
+              <p className="mt-1 text-xs font-medium text-zinc-400">{note}</p>
+            </article>
+          ))}
+        </section>
 
-        <div className="overflow-hidden rounded-lg border border-amber-100 bg-white shadow-sm shadow-zinc-200/50">
-          <div className="flex items-center justify-between gap-4 p-5">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-amber-700">Total Pending Amount</p>
-              <p className="mt-2 truncate text-3xl font-semibold text-zinc-950">
-                {money(report.totals.totalPendingAmount)}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">Current customer due balance</p>
-            </div>
-            <div className="grid size-12 shrink-0 place-items-center rounded-md bg-amber-50 text-sm font-semibold text-amber-700">
-              Due
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <Card className="min-h-[calc(100vh-16rem)] overflow-hidden rounded-xl bg-white">
-        <CardHeader className="border-b border-zinc-200 p-4 sm:p-5">
-          <div className="grid w-full gap-4 lg:grid-cols-[auto_1fr_auto] lg:items-center">
-            <div className="inline-grid w-full grid-cols-2 rounded-lg border border-zinc-200 bg-zinc-50 p-1 sm:w-auto">
+        <section className="rounded-[1.25rem] border border-[#337418]/15 bg-white p-3 shadow-sm sm:rounded-[1.45rem] sm:p-4">
+          <div className="grid gap-3">
+            <div className="inline-grid grid-cols-2 rounded-2xl border border-[#337418]/15 bg-[#337418]/5 p-1">
               {[
                 ["customers", "Customers"],
-                ["sessions", "Session"],
+                ["sessions", "Sessions"],
               ].map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setMode(value as ReportMode)}
                   className={cn(
-                    "h-10 min-w-32 rounded-md px-4 text-sm font-semibold transition",
-                    mode === value
-                      ? "bg-[#3195EF] text-white shadow-sm"
-                      : "text-zinc-600 hover:bg-white hover:text-zinc-950",
+                    "h-10 rounded-xl px-4 text-sm font-extrabold transition",
+                    mode === value ? "bg-[#337418] text-[#F8F8F8]" : "text-zinc-500 hover:text-[#337418]",
                   )}
                 >
                   {label}
@@ -286,123 +297,74 @@ export function ReportsManager() {
               ))}
             </div>
 
-            <div className="min-w-0">
-              <CardTitle className="truncate text-lg">{exportLabel}</CardTitle>
-              <p className="mt-1 text-sm text-zinc-500">
-                Showing {activeCount} record{activeCount === 1 ? "" : "s"}
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-extrabold leading-tight text-zinc-950">{exportLabel}</h2>
+                <p className="mt-0.5 text-sm text-zinc-500">
+                  Showing {activeCount} record{activeCount === 1 ? "" : "s"}
+                </p>
+              </div>
+              <p className="text-right text-xs font-semibold text-zinc-400">
+                {loading ? "Refreshing..." : date ? `Date: ${date}` : "All dates"}
               </p>
             </div>
 
-            <div className="text-left text-sm text-zinc-500 lg:text-right">
-              {loading ? "Refreshing report..." : date ? `Date: ${date}` : "All dates"}
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-4 sm:p-6">
-          <div className="overflow-x-auto rounded-lg border border-zinc-200">
-            {mode === "customers" ? (
-              <Table className="min-w-[900px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer Name</TableHead>
-                    <TableHead>Customer Amount Spend</TableHead>
-                    <TableHead>Customer Play Number of Games</TableHead>
-                    <TableHead>Pending Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="py-12 text-center text-zinc-500">
-                        Loading customer reports...
-                      </TableCell>
-                    </TableRow>
-                  ) : error ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="py-12 text-center text-red-600">
-                        {error}
-                      </TableCell>
-                    </TableRow>
-                  ) : report.customers.length ? (
-                    report.customers.map((customer) => (
-                      <TableRow key={customer.id}>
-                        <TableCell className="font-semibold">{customer.customerName}</TableCell>
-                        <TableCell>{money(customer.amountSpent)}</TableCell>
-                        <TableCell>{customer.gamesPlayed}</TableCell>
-                        <TableCell
-                          className={customer.pendingAmount > 0 ? "font-semibold text-red-600" : ""}
-                        >
-                          {money(customer.pendingAmount)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={4} className="py-12 text-center text-zinc-500">
-                        No customers found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+            {loading ? (
+              <div className="rounded-2xl border border-[#337418]/15 bg-white p-6 text-center text-sm font-semibold text-zinc-500 shadow-sm">
+                Loading reports...
+              </div>
+            ) : error ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm font-semibold text-red-700">
+                {error}
+              </div>
+            ) : mode === "customers" ? (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {report.customers.length ? (
+                  report.customers.map((customer) => (
+                    <article key={customer.id} className="rounded-2xl border border-[#337418]/20 bg-white p-3 shadow-sm">
+                      <h3 className="truncate text-base font-extrabold text-zinc-950">{customer.customerName}</h3>
+                      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                        <div><p className="text-zinc-400">Spent</p><p className="mt-1 font-bold text-[#337418]">{money(customer.amountSpent)}</p></div>
+                        <div><p className="text-zinc-400">Games</p><p className="mt-1 font-bold text-zinc-900">{customer.gamesPlayed}</p></div>
+                        <div className="col-span-2"><p className="text-zinc-400">Pending</p><p className={cn("mt-1 font-bold", customer.pendingAmount > 0 ? "text-red-600" : "text-[#337418]")}>{money(customer.pendingAmount)}</p></div>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="rounded-2xl border border-[#337418]/15 bg-white p-6 text-center text-sm font-semibold text-zinc-500 shadow-sm md:col-span-2 xl:col-span-3">
+                    No customers found.
+                  </p>
+                )}
+              </div>
             ) : (
-              <Table className="min-w-[1100px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Session Customer Name</TableHead>
-                    <TableHead>Mobile Number</TableHead>
-                    <TableHead>Table Name</TableHead>
-                    <TableHead>Revenue Amount</TableHead>
-                    <TableHead>Pending Amount</TableHead>
-                    <TableHead>Session Created Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="py-12 text-center text-zinc-500">
-                        Loading session reports...
-                      </TableCell>
-                    </TableRow>
-                  ) : error ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="py-12 text-center text-red-600">
-                        {error}
-                      </TableCell>
-                    </TableRow>
-                  ) : report.sessions.length ? (
-                    report.sessions.map((session) => (
-                      <TableRow key={session.id}>
-                        <TableCell className="max-w-[260px] whitespace-normal font-semibold">
-                          {session.customerNames || "-"}
-                        </TableCell>
-                        <TableCell className="max-w-[220px] whitespace-normal">
-                          {session.mobileNumbers || "-"}
-                        </TableCell>
-                        <TableCell>{session.tableName}</TableCell>
-                        <TableCell>{money(session.revenueAmount)}</TableCell>
-                        <TableCell
-                          className={session.pendingAmount > 0 ? "font-semibold text-red-600" : ""}
-                        >
-                          {money(session.pendingAmount)}
-                        </TableCell>
-                        <TableCell>{new Date(session.createdAt).toLocaleString("en-IN")}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={6} className="py-12 text-center text-zinc-500">
-                        No completed sessions found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {report.sessions.length ? (
+                  report.sessions.map((session) => (
+                    <article key={session.id} className="rounded-2xl border border-[#337418]/20 bg-white p-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-base font-extrabold text-zinc-950">{session.customerNames || "-"}</h3>
+                          <p className="mt-1 truncate text-xs font-semibold text-zinc-500">{session.mobileNumbers || "-"}</p>
+                        </div>
+                        <span className="rounded-full bg-[#337418]/15 px-3 py-1 text-xs font-extrabold text-[#337418]">{money(session.revenueAmount)}</span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                        <div><p className="text-zinc-400">Table</p><p className="mt-1 font-bold text-zinc-900">{session.tableName}</p></div>
+                        <div><p className="text-zinc-400">Pending</p><p className={cn("mt-1 font-bold", session.pendingAmount > 0 ? "text-red-600" : "text-[#337418]")}>{money(session.pendingAmount)}</p></div>
+                        <div className="col-span-2"><p className="text-zinc-400">Created</p><p className="mt-1 font-bold text-zinc-900">{new Date(session.createdAt).toLocaleString("en-IN")}</p></div>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="rounded-2xl border border-[#337418]/15 bg-white p-6 text-center text-sm font-semibold text-zinc-500 shadow-sm md:col-span-2 xl:col-span-3">
+                    No completed sessions found.
+                  </p>
+                )}
+              </div>
             )}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </section>
+      </div>
+    </section>
   );
 }

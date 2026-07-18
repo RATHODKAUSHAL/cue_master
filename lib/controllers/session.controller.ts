@@ -5,11 +5,13 @@ import {
   getSession,
   listSessionHistory,
   listSessions,
+  notifySessionCompleted,
   pauseSession,
   resumeSession,
   SessionModelError,
   startSession,
   updateSession,
+  updateSessionAddOnAmount,
   deleteSession,
   type FinalizeSessionPayload,
   type SessionPaymentInput,
@@ -40,6 +42,7 @@ type FinalizeSessionInput = {
     mode?: string;
     amount?: number;
   }>;
+  addOnAmount?: number;
   extraPaymentAction?: string | null;
   extraAmount?: number;
 };
@@ -109,6 +112,7 @@ function normalizeStartInput(input: StartSessionInput) {
 function normalizeFinalizeInput(input: FinalizeSessionInput) {
   const ownerResult =
     input.ownerResult === "OWNER_WON" || input.ownerResult === "OWNER_LOST" ? input.ownerResult : null;
+  const addOnAmount = normalizeAmount(input.addOnAmount || 0);
   const extraPaymentAction = input.extraPaymentAction === "WALLET" ? "WALLET" : null;
   const extraAmount = normalizeAmount(input.extraAmount || 0);
   const players: SessionPlayerInput[] = [];
@@ -166,12 +170,17 @@ function normalizeFinalizeInput(input: FinalizeSessionInput) {
     return { ok: false as const, status: 400, message: "Enter a valid extra amount." };
   }
 
+  if (!Number.isFinite(addOnAmount) || addOnAmount < 0) {
+    return { ok: false as const, status: 400, message: "Enter a valid add-on amount." };
+  }
+
   return {
     ok: true as const,
     data: {
       ownerResult,
       players,
       payments,
+      addOnAmount,
       extraPaymentAction,
       extraAmount,
     } satisfies FinalizeSessionPayload,
@@ -264,6 +273,35 @@ export async function updateSessionForUser(ownerId: string, id: string, input: S
     return { ok: true as const, session };
   } catch (error) {
     return handleSessionError(error, "Unable to update session.");
+  }
+}
+
+export async function updateSessionAddOnForUser(ownerId: string, id: string, deltaInput: unknown) {
+  const delta = normalizeAmount(deltaInput);
+
+  if (!Number.isFinite(delta) || delta === 0) {
+    return { ok: false as const, status: 400, message: "Enter a valid add-on amount." };
+  }
+
+  try {
+    const session = await updateSessionAddOnAmount(ownerId, id, delta);
+
+    if (!session) {
+      return { ok: false as const, status: 404, message: "Session not found." };
+    }
+
+    return { ok: true as const, addOnAmount: session.addOnAmount };
+  } catch (error) {
+    return handleSessionError(error, "Unable to update add-on amount.");
+  }
+}
+
+export async function notifySessionCompletedForUser(ownerId: string, id: string) {
+  try {
+    const result = await notifySessionCompleted(ownerId, id);
+    return { ok: true as const, ...result };
+  } catch (error) {
+    return handleSessionError(error, "Unable to send session notification.");
   }
 }
 

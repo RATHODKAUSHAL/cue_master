@@ -42,6 +42,8 @@ model User {
   tables       VenueTable[]
   customers    Customer[]
   sessions     GameSession[]
+  addOns       AddOnAmount[]
+  pushSubscriptions PushSubscription[]
 
   @@map("users")
 }
@@ -87,6 +89,33 @@ model Customer {
   @@map("customers")
 }
 
+model AddOnAmount {
+  id        String   @id @default(cuid())
+  ownerId   String
+  amount    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, amount])
+  @@index([ownerId, amount])
+  @@map("add_on_amounts")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
 model GameSession {
   id                     String           @id @default(cuid())
   ownerId                String
@@ -98,6 +127,7 @@ model GameSession {
   plannedDurationMinutes Int
   defaultDurationMinutes Int              @default(45)
   calculatedAmount       Int
+  addOnAmount            Int              @default(0)
   finalAmount            Int?
   status                 SessionStatus    @default(ACTIVE)
   ownerPlaying           Boolean          @default(false)
@@ -107,6 +137,7 @@ model GameSession {
   totalPausedSeconds     Int              @default(0)
   endedAt                DateTime?
   finalizedAt            DateTime?
+  completedNotificationSentAt DateTime?
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
   owner                  User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)

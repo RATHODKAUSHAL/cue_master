@@ -19,6 +19,7 @@ export async function POST(
     ownerResult: body.ownerResult,
     players: Array.isArray(body.players) ? body.players : [],
     payments: Array.isArray(body.payments) ? body.payments : [],
+    addOnAmount: body.addOnAmount === undefined ? undefined : Number(body.addOnAmount),
     extraPaymentAction: body.extraPaymentAction,
     extraAmount: body.extraAmount === undefined ? undefined : Number(body.extraAmount),
   });

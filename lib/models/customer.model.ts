@@ -5,8 +5,8 @@ export type CustomerPayload = {
   mobileNumber: string;
 };
 
-export function findCustomerByMobile(ownerId: string, mobileNumber: string) {
-  return prisma.customer.findUnique({
+export async function findCustomerByMobile(ownerId: string, mobileNumber: string) {
+  const customer = await prisma.customer.findUnique({
     where: {
       ownerId_mobileNumber: {
         ownerId,
@@ -14,6 +14,31 @@ export function findCustomerByMobile(ownerId: string, mobileNumber: string) {
       },
     },
   });
+
+  if (!customer) {
+    return null;
+  }
+
+  const ledgerRows = await prisma.pendingLedger.groupBy({
+    by: ["type"],
+    where: {
+      ownerId,
+      customerId: customer.id,
+    },
+    _sum: { amount: true },
+  });
+  const ledgerPendingAmount = Math.max(
+    0,
+    ledgerRows.reduce((sum, row) => {
+      const amount = row._sum.amount || 0;
+      return row.type === "CREATED" ? sum + amount : sum - amount;
+    }, 0),
+  );
+
+  return {
+    ...customer,
+    pendingAmount: Math.max(customer.pendingAmount, ledgerPendingAmount),
+  };
 }
 
 export async function listCustomers(ownerId: string, search?: string) {

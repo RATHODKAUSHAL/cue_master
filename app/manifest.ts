@@ -4,25 +4,108 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "CueDesk CRM",
     short_name: "CueDesk",
+    id: "/",
     description:
       "Pool and snooker table CRM for sessions, customers, pending amounts, analytics, and revenue.",
-    start_url: "/",
+    start_url: "/?source=pwa",
     scope: "/",
     display: "standalone",
+    orientation: "portrait-primary",
     background_color: "#ffffff",
-    theme_color: "#ffffff",
+    theme_color: "#337418",
+    categories: ["business", "productivity"],
+    screenshots: [
+      {
+        src: "/screenshots/cuedesk-mobile.png",
+        sizes: "540x720",
+        type: "image/png",
+        form_factor: "narrow",
+        label: "CueDesk mobile dashboard",
+      },
+      {
+        src: "/pool-crm-dashboard.png",
+        sizes: "1568x1003",
+        type: "image/png",
+        form_factor: "wide",
+        label: "CueDesk desktop dashboard",
+      },
+    ],
+    shortcuts: [
+      {
+        name: "Sessions",
+        short_name: "Sessions",
+        description: "Open live sessions",
+        url: "/sessions?source=pwa-shortcut",
+        icons: [
+          {
+            src: "/icons/shortcut-sessions-96.png",
+            sizes: "96x96",
+            type: "image/png",
+          },
+        ],
+      },
+      {
+        name: "Reports",
+        short_name: "Reports",
+        description: "Open reports",
+        url: "/reports?source=pwa-shortcut",
+        icons: [
+          {
+            src: "/icons/shortcut-reports-96.png",
+            sizes: "96x96",
+            type: "image/png",
+          },
+        ],
+      },
+    ],
     icons: [
       {
-        src: "/icons/cuedesk-icon.svg",
-        sizes: "any",
-        type: "image/svg+xml",
+        src: "/icons/cue-master-logo.png",
+        sizes: "1024x1024",
+        type: "image/png",
         purpose: "any",
+      },
+      {
+        src: "/icons/cue-master-logo.png",
+        sizes: "1024x1024",
+        type: "image/png",
+        purpose: "maskable",
+      },
+      {
+        src: "/icons/cuedesk-icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icons/cue-master-logo-256.png",
+        sizes: "256x256",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icons/cue-master-logo-384.png",
+        sizes: "384x384",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icons/cuedesk-icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icons/cuedesk-maskable-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
       },
       {
         src: "/icons/cuedesk-icon.svg",
         sizes: "any",
         type: "image/svg+xml",
-        purpose: "maskable",
+        purpose: "any",
       },
     ],
   };
